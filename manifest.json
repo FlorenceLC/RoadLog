@@ -1,26 +1,18 @@
 {
-    "name": "RoadLog - Journal d'observations routières",
-    "short_name": "RoadLog",
-    "description": "Application de suivi des observations routières",
-    "start_url": "/",
-    "display": "standalone",
-    "background_color": "#1a1a2e",
-    "theme_color": "#1a1a2e",
-    "orientation": "portrait-primary",
-    "icons": [
-        {
-            "src": "assets/icons/icon-192.png",
-            "sizes": "192x192",
-            "type": "image/png",
-            "purpose": "any maskable"
-        },
-        {
-            "src": "assets/icons/icon-512.png",
-            "sizes": "512x512",
-            "type": "image/png",
-            "purpose": "any maskable"
-        }
-    ],
-    "categories": ["utilities", "productivity"],
-    "lang": "fr-FR"
+  "name": "RoadLog",
+  "short_name": "RoadLog",
+  "description": "Application d'observations routières",
+  "start_url": "./index.html",
+  "display": "standalone",
+  "orientation": "portrait",
+  "background_color": "#0f172a",
+  "theme_color": "#1e293b",
+  "icons": [
+    {
+      "src": "data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 512 512'%3E%3Crect width='512' height='512' rx='80' fill='%231e293b'/%3E%3Cpath d='M256 80L80 168l176 88 176-88L256 80z' fill='none' stroke='%233b82f6' stroke-width='24'/%3E%3Cpath d='M80 344l176 88 176-88' fill='none' stroke='%233b82f6' stroke-width='24'/%3E%3Cpath d='M80 256l176 88 176-88' fill='none' stroke='%233b82f6' stroke-width='24'/%3E%3C/svg%3E",
+      "sizes": "512x512",
+      "type": "image/svg+xml",
+      "purpose": "any maskable"
+    }
+  ]
 }

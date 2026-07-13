@@ -1,437 +1,2371 @@
 <!DOCTYPE html>
 <html lang="fr">
 <head>
-    <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=no, viewport-fit=cover">
-    <meta name="theme-color" content="#1a1a2e">
-    <meta name="apple-mobile-web-app-capable" content="yes">
-    <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
-    <meta name="description" content="RoadLog - Journal d'observations routières">
-    
-    <title>RoadLog</title>
-    
-    <!-- Manifest PWA -->
-    <link rel="manifest" href="manifest.json">
-    <link rel="apple-touch-icon" href="assets/icons/icon-192.png">
-    
-    <!-- Leaflet CSS pour la carte -->
-    <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" />
-    
-    <!-- Feuilles de style -->
-    <link rel="stylesheet" href="css/main.css">
-    <link rel="stylesheet" href="css/components.css">
-    <link rel="stylesheet" href="css/responsive.css">
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=no">
+<title>RoadLog</title>
+<meta name="description" content="Application d'observations routières">
+<meta name="theme-color" content="#1e293b">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+<link rel="manifest" href="manifest.json">
+
+<!-- Leaflet CSS -->
+<link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css"/>
+<!-- Leaflet JS -->
+<script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
+<!-- Chart.js -->
+<script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.4/dist/chart.umd.min.js"></script>
+<!-- QRCode.js -->
+<script src="https://cdnjs.cloudflare.com/ajax/libs/qrcodejs/1.0.0/qrcode.min.js"></script>
+<!-- jsPDF -->
+<script src="https://unpkg.com/jspdf@latest/dist/jspdf.umd.min.js"></script>
+<!-- SheetJS -->
+<script src="https://cdn.sheetjs.com/xlsx-0.20.3/package/dist/xlsx.full.min.js"></script>
+<!-- Tailwind CSS -->
+<script src="https://cdn.jsdelivr.net/npm/@tailwindcss/browser@4"></script>
+
+<style>
+/* ============================================================
+   ROADLOG – Global Styles
+   ============================================================ */
+@import url('https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800;900&display=swap');
+
+:root {
+  --bg-primary: #0f172a;
+  --bg-secondary: #1e293b;
+  --bg-tertiary: #334155;
+  --accent: #3b82f6;
+  --accent-hover: #2563eb;
+  --accent-glow: rgba(59,130,246,0.3);
+  --success: #22c55e;
+  --warning: #f59e0b;
+  --danger: #ef4444;
+  --text-primary: #f1f5f9;
+  --text-secondary: #94a3b8;
+  --text-muted: #64748b;
+  --border: #334155;
+  --card-bg: #1e293b;
+  --sidebar-bg: #0f172a;
+  --radius: 12px;
+  --shadow: 0 4px 24px rgba(0,0,0,0.3);
+}
+
+* { box-sizing: border-box; margin: 0; padding: 0; }
+html, body {
+  font-family: 'Inter', system-ui, sans-serif;
+  background: var(--bg-primary);
+  color: var(--text-primary);
+  height: 100%; overflow: hidden;
+  -webkit-tap-highlight-color: transparent;
+  -webkit-font-smoothing: antialiased;
+}
+
+/* Scrollbar */
+::-webkit-scrollbar { width: 4px; }
+::-webkit-scrollbar-track { background: transparent; }
+::-webkit-scrollbar-thumb { background: var(--bg-tertiary); border-radius: 4px; }
+
+/* ============================================================
+   Layout
+   ============================================================ */
+#app { display: flex; flex-direction: column; height: 100vh; }
+
+/* Top bar */
+.topbar {
+  display: flex; align-items: center; justify-content: space-between;
+  padding: 12px 16px; background: var(--bg-secondary);
+  border-bottom: 1px solid var(--border); z-index: 100;
+  position: relative; min-height: 56px;
+}
+.topbar h1 { font-size: 1.25rem; font-weight: 700; }
+.topbar-logo { display: flex; align-items: center; gap: 8px; }
+.topbar-logo svg { width: 28px; height: 28px; }
+.topbar-actions { display: flex; gap: 8px; }
+
+/* Hamburger */
+.hamburger {
+  background: none; border: none; color: var(--text-primary);
+  cursor: pointer; padding: 8px; border-radius: 8px;
+  transition: background 0.2s;
+}
+.hamburger:hover { background: var(--bg-tertiary); }
+.hamburger svg { width: 24px; height: 24px; }
+
+/* Sidebar / Overlay */
+.sidebar-overlay {
+  position: fixed; inset: 0; background: rgba(0,0,0,0.6);
+  z-index: 200; opacity: 0; pointer-events: none;
+  transition: opacity 0.3s;
+}
+.sidebar-overlay.active { opacity: 1; pointer-events: auto; }
+
+.sidebar {
+  position: fixed; top: 0; left: -300px; width: 280px; height: 100%;
+  background: var(--sidebar-bg); z-index: 201;
+  transition: left 0.3s cubic-bezier(0.4,0,0.2,1);
+  display: flex; flex-direction: column;
+  border-right: 1px solid var(--border);
+}
+.sidebar.active { left: 0; }
+.sidebar-header {
+  padding: 20px; border-bottom: 1px solid var(--border);
+  display: flex; align-items: center; gap: 12px;
+}
+.sidebar-header h2 { font-size: 1.3rem; font-weight: 800; }
+.sidebar-nav { flex: 1; overflow-y: auto; padding: 8px; }
+.sidebar-nav button {
+  width: 100%; text-align: left; padding: 14px 16px;
+  background: none; border: none; color: var(--text-secondary);
+  font-size: 0.95rem; cursor: pointer; border-radius: 10px;
+  display: flex; align-items: center; gap: 12px;
+  transition: all 0.2s; font-family: inherit;
+}
+.sidebar-nav button:hover, .sidebar-nav button.active {
+  background: var(--bg-tertiary); color: var(--text-primary);
+}
+.sidebar-nav button svg { width: 20px; height: 20px; flex-shrink: 0; }
+
+/* Main content */
+.main-content {
+  flex: 1; overflow-y: auto; overflow-x: hidden;
+  padding: 16px; padding-bottom: 100px;
+  scroll-behavior: smooth;
+}
+
+/* ============================================================
+   Cards
+   ============================================================ */
+.card {
+  background: var(--card-bg); border-radius: var(--radius);
+  border: 1px solid var(--border); padding: 20px;
+  margin-bottom: 16px; transition: transform 0.2s, box-shadow 0.2s;
+}
+.card:hover { box-shadow: var(--shadow); }
+.card-header {
+  display: flex; align-items: center; justify-content: space-between;
+  margin-bottom: 16px;
+}
+.card-title {
+  font-size: 1rem; font-weight: 600;
+  display: flex; align-items: center; gap: 8px;
+}
+.card-title svg { width: 18px; height: 18px; color: var(--accent); }
+
+/* Stats cards */
+.stats-grid {
+  display: grid; grid-template-columns: repeat(2, 1fr);
+  gap: 12px;
+}
+@media(min-width: 768px) { .stats-grid { grid-template-columns: repeat(4, 1fr); } }
+.stat-card {
+  background: var(--bg-tertiary); border-radius: var(--radius);
+  padding: 16px; text-align: center;
+}
+.stat-value { font-size: 1.8rem; font-weight: 800; color: var(--accent); }
+.stat-label { font-size: 0.75rem; color: var(--text-muted); margin-top: 4px; text-transform: uppercase; letter-spacing: 0.05em; }
+
+/* ============================================================
+   Buttons
+   ============================================================ */
+.btn {
+  display: inline-flex; align-items: center; justify-content: center;
+  gap: 8px; padding: 12px 24px; border-radius: 10px;
+  font-weight: 600; font-size: 0.95rem; cursor: pointer;
+  border: none; transition: all 0.2s; font-family: inherit;
+  white-space: nowrap;
+}
+.btn-primary { background: var(--accent); color: #fff; }
+.btn-primary:hover { background: var(--accent-hover); box-shadow: 0 0 20px var(--accent-glow); }
+.btn-secondary { background: var(--bg-tertiary); color: var(--text-primary); }
+.btn-secondary:hover { background: #475569; }
+.btn-danger { background: var(--danger); color: #fff; }
+.btn-danger:hover { background: #dc2626; }
+.btn-success { background: var(--success); color: #fff; }
+.btn-success:hover { background: #16a34a; }
+.btn-lg { padding: 18px 32px; font-size: 1.1rem; border-radius: 14px; }
+.btn-full { width: 100%; }
+.btn-icon {
+  width: 44px; height: 44px; padding: 0;
+  border-radius: 10px; display: flex;
+  align-items: center; justify-content: center;
+}
+.btn-icon svg { width: 20px; height: 20px; }
+
+/* Big mic / one-hand button */
+.btn-mega {
+  width: 120px; height: 120px; border-radius: 50%;
+  font-size: 2rem; box-shadow: 0 0 40px var(--accent-glow);
+  position: fixed; bottom: 30px; right: 30px; z-index: 50;
+  background: var(--accent); color: white; border: none;
+  cursor: pointer; display: flex; align-items: center;
+  justify-content: center; transition: all 0.3s;
+}
+.btn-mega:active, .btn-mega.listening {
+  transform: scale(1.1);
+  box-shadow: 0 0 60px var(--accent-glow), 0 0 100px rgba(59,130,246,0.2);
+}
+.btn-mega.listening { animation: pulse-ring 1.5s infinite; }
+@keyframes pulse-ring {
+  0% { box-shadow: 0 0 40px var(--accent-glow); }
+  50% { box-shadow: 0 0 80px rgba(59,130,246,0.5), 0 0 120px rgba(59,130,246,0.2); }
+  100% { box-shadow: 0 0 40px var(--accent-glow); }
+}
+
+/* ============================================================
+   Forms
+   ============================================================ */
+.form-group { margin-bottom: 16px; }
+.form-label {
+  display: block; font-size: 0.85rem; font-weight: 600;
+  color: var(--text-secondary); margin-bottom: 6px;
+  text-transform: uppercase; letter-spacing: 0.03em;
+}
+.form-input, .form-textarea, .form-select {
+  width: 100%; padding: 12px 16px; background: var(--bg-primary);
+  border: 1px solid var(--border); border-radius: 10px;
+  color: var(--text-primary); font-size: 1rem;
+  font-family: inherit; transition: border-color 0.2s;
+}
+.form-input:focus, .form-textarea:focus, .form-select:focus {
+  outline: none; border-color: var(--accent);
+  box-shadow: 0 0 0 3px var(--accent-glow);
+}
+.form-textarea { min-height: 100px; resize: vertical; }
+
+/* Chips / Tags */
+.chips-container { display: flex; flex-wrap: wrap; gap: 8px; }
+.chip {
+  padding: 8px 14px; border-radius: 20px; font-size: 0.85rem;
+  cursor: pointer; border: 1px solid var(--border);
+  background: var(--bg-primary); color: var(--text-secondary);
+  transition: all 0.2s; user-select: none;
+}
+.chip.selected {
+  background: var(--accent); color: #fff;
+  border-color: var(--accent);
+}
+.chip:hover { border-color: var(--accent); }
+
+/* ============================================================
+   Table
+   ============================================================ */
+.table-container { overflow-x: auto; }
+table { width: 100%; border-collapse: collapse; font-size: 0.85rem; }
+th {
+  text-align: left; padding: 10px 12px; background: var(--bg-primary);
+  color: var(--text-muted); font-weight: 600; text-transform: uppercase;
+  font-size: 0.75rem; letter-spacing: 0.05em; cursor: pointer;
+  border-bottom: 1px solid var(--border); white-space: nowrap;
+  user-select: none;
+}
+th:hover { color: var(--text-primary); }
+td {
+  padding: 12px; border-bottom: 1px solid var(--border);
+  vertical-align: middle;
+}
+tr:hover td { background: rgba(59,130,246,0.05); }
+.plate-badge {
+  background: var(--bg-primary); padding: 4px 10px;
+  border-radius: 6px; font-weight: 700; font-size: 0.85rem;
+  border: 1px solid var(--border); cursor: pointer;
+  display: inline-block; letter-spacing: 0.05em;
+  transition: all 0.2s;
+}
+.plate-badge:hover { border-color: var(--accent); color: var(--accent); }
+
+/* ============================================================
+   Alert banner
+   ============================================================ */
+.alert-banner {
+  padding: 12px 16px; border-radius: 10px; margin-bottom: 16px;
+  display: flex; align-items: center; gap: 10px;
+  font-size: 0.9rem; font-weight: 500;
+}
+.alert-banner.warning { background: rgba(245,158,11,0.15); color: var(--warning); border: 1px solid rgba(245,158,11,0.3); }
+.alert-banner.info { background: rgba(59,130,246,0.15); color: var(--accent); border: 1px solid rgba(59,130,246,0.3); }
+.alert-banner.success { background: rgba(34,197,94,0.15); color: var(--success); border: 1px solid rgba(34,197,94,0.3); }
+.alert-banner.error { background: rgba(239,68,68,0.15); color: var(--danger); border: 1px solid rgba(239,68,68,0.3); }
+
+/* ============================================================
+   Modal
+   ============================================================ */
+.modal-overlay {
+  position: fixed; inset: 0; background: rgba(0,0,0,0.7);
+  z-index: 300; display: flex; align-items: center;
+  justify-content: center; padding: 16px;
+  opacity: 0; pointer-events: none; transition: opacity 0.3s;
+}
+.modal-overlay.active { opacity: 1; pointer-events: auto; }
+.modal {
+  background: var(--bg-secondary); border-radius: 16px;
+  border: 1px solid var(--border); width: 100%;
+  max-width: 500px; max-height: 90vh; overflow-y: auto;
+  padding: 24px; box-shadow: var(--shadow);
+  transform: translateY(20px); transition: transform 0.3s;
+}
+.modal-overlay.active .modal { transform: translateY(0); }
+.modal-header {
+  display: flex; align-items: center; justify-content: space-between;
+  margin-bottom: 20px;
+}
+.modal-title { font-size: 1.2rem; font-weight: 700; }
+
+/* ============================================================
+   Toast notifications
+   ============================================================ */
+#toast-container {
+  position: fixed; top: 70px; right: 16px; z-index: 400;
+  display: flex; flex-direction: column; gap: 8px;
+}
+.toast {
+  padding: 14px 20px; border-radius: 10px; font-size: 0.9rem;
+  font-weight: 500; animation: slideIn 0.3s ease-out;
+  box-shadow: var(--shadow); max-width: 350px;
+}
+.toast.success { background: var(--success); color: #fff; }
+.toast.error { background: var(--danger); color: #fff; }
+.toast.info { background: var(--accent); color: #fff; }
+@keyframes slideIn { from { transform: translateX(100%); opacity:0; } to { transform: translateX(0); opacity:1; } }
+
+/* ============================================================
+   Page transitions
+   ============================================================ */
+.page { display: none; animation: fadeIn 0.3s ease; }
+.page.active { display: block; }
+@keyframes fadeIn { from { opacity:0; transform: translateY(8px); } to { opacity:1; transform:translateY(0); } }
+
+/* ============================================================
+   Leaflet overrides
+   ============================================================ */
+#map-container { height: 60vh; border-radius: var(--radius); overflow: hidden; border: 1px solid var(--border); }
+.leaflet-popup-content-wrapper { background: var(--bg-secondary) !important; color: var(--text-primary) !important; border-radius: 10px !important; }
+.leaflet-popup-tip { background: var(--bg-secondary) !important; }
+.leaflet-popup-content { margin: 12px !important; }
+
+/* ============================================================
+   Pagination
+   ============================================================ */
+.pagination {
+  display: flex; align-items: center; justify-content: center;
+  gap: 4px; margin-top: 16px;
+}
+.pagination button {
+  width: 36px; height: 36px; border-radius: 8px;
+  border: 1px solid var(--border); background: var(--bg-primary);
+  color: var(--text-secondary); cursor: pointer; font-weight: 600;
+  font-size: 0.85rem; transition: all 0.2s; font-family: inherit;
+}
+.pagination button:hover, .pagination button.active {
+  background: var(--accent); color: #fff; border-color: var(--accent);
+}
+.pagination button:disabled { opacity: 0.3; cursor: default; }
+
+/* ============================================================
+   Favorites star
+   ============================================================ */
+.star-btn {
+  background: none; border: none; cursor: pointer;
+  font-size: 1.2rem; transition: transform 0.2s;
+}
+.star-btn:hover { transform: scale(1.2); }
+
+/* ============================================================
+   Photo thumbnails
+   ============================================================ */
+.photo-grid { display: flex; gap: 8px; flex-wrap: wrap; }
+.photo-thumb {
+  width: 80px; height: 80px; border-radius: 8px;
+  object-fit: cover; border: 1px solid var(--border);
+  cursor: pointer; transition: transform 0.2s;
+}
+.photo-thumb:hover { transform: scale(1.05); }
+
+/* Speech indicator */
+.speech-indicator {
+  display: inline-flex; align-items: center; gap: 6px;
+  color: var(--danger); font-weight: 600; font-size: 0.9rem;
+}
+.speech-dot {
+  width: 8px; height: 8px; background: var(--danger);
+  border-radius: 50%; animation: blink 1s infinite;
+}
+@keyframes blink { 50% { opacity: 0.2; } }
+
+/* Responsive fixes */
+@media (max-width: 640px) {
+  .stats-grid { grid-template-columns: repeat(2, 1fr); gap: 8px; }
+  .btn-mega { width: 80px; height: 80px; bottom: 20px; right: 20px; font-size: 1.4rem; }
+  .modal { padding: 16px; }
+  .main-content { padding: 12px; padding-bottom: 110px; }
+  .hide-mobile { display: none !important; }
+}
+@media (min-width: 641px) and (max-width: 1024px) {
+  .btn-mega { width: 90px; height: 90px; }
+}
+
+/* Setup page */
+.setup-container {
+  min-height: 100vh; display: flex; align-items: center;
+  justify-content: center; padding: 20px;
+}
+.setup-card {
+  background: var(--card-bg); border-radius: 16px;
+  border: 1px solid var(--border); padding: 32px;
+  max-width: 420px; width: 100%;
+}
+.setup-logo { text-align: center; margin-bottom: 24px; }
+.setup-logo h1 { font-size: 2rem; font-weight: 900; }
+.setup-logo p { color: var(--text-muted); margin-top: 4px; }
+
+/* Search bar */
+.search-bar {
+  position: relative; margin-bottom: 16px;
+}
+.search-bar input {
+  width: 100%; padding: 10px 16px 10px 40px;
+  background: var(--bg-primary); border: 1px solid var(--border);
+  border-radius: 10px; color: var(--text-primary);
+  font-size: 0.9rem; font-family: inherit;
+}
+.search-bar input:focus { outline: none; border-color: var(--accent); }
+.search-bar svg {
+  position: absolute; left: 12px; top: 50%;
+  transform: translateY(-50%); width: 18px; height: 18px;
+  color: var(--text-muted);
+}
+
+/* Filters bar */
+.filters-bar {
+  display: flex; gap: 8px; flex-wrap: wrap; margin-bottom: 12px;
+}
+.filters-bar select, .filters-bar input {
+  padding: 8px 12px; background: var(--bg-primary);
+  border: 1px solid var(--border); border-radius: 8px;
+  color: var(--text-primary); font-size: 0.85rem;
+  font-family: inherit;
+}
+
+/* Sync indicator */
+.sync-indicator {
+  width: 8px; height: 8px; border-radius: 50%;
+  display: inline-block;
+}
+.sync-indicator.synced { background: var(--success); }
+.sync-indicator.syncing { background: var(--warning); animation: blink 0.8s infinite; }
+.sync-indicator.error { background: var(--danger); }
+
+/* Loading spinner */
+.spinner {
+  width: 32px; height: 32px; border: 3px solid var(--border);
+  border-top-color: var(--accent); border-radius: 50%;
+  animation: spin 0.8s linear infinite; margin: 20px auto;
+}
+@keyframes spin { to { transform: rotate(360deg); } }
+
+/* Category management */
+.cat-list-item {
+  display: flex; align-items: center; justify-content: space-between;
+  padding: 12px 16px; border-bottom: 1px solid var(--border);
+  transition: background 0.2s;
+}
+.cat-list-item:hover { background: var(--bg-tertiary); }
+.cat-list-item:last-child { border-bottom: none; }
+</style>
 </head>
 <body>
-    <!-- ==================== ÉCRAN DE CHARGEMENT ==================== -->
-    <div id="splash-screen" class="splash-screen">
-        <div class="splash-content">
-            <div class="splash-icon">🚗</div>
-            <h1>RoadLog</h1>
-            <div class="splash-loader">
-                <div class="loader-bar"></div>
-            </div>
-            <p>Chargement...</p>
-        </div>
-    </div>
 
-    <!-- ==================== ÉCRAN DE CONFIGURATION INITIALE ==================== -->
-    <div id="setup-screen" class="setup-screen hidden">
-        <div class="setup-content">
-            <div class="setup-icon">⚙️</div>
-            <h1>Configuration initiale</h1>
-            <p>Configurez votre connexion GitHub pour synchroniser vos données.</p>
-            
-            <div class="form-group">
-                <label for="setup-token">Token GitHub (Personal Access Token)</label>
-                <div class="input-with-icon">
-                    <input type="password" id="setup-token" placeholder="ghp_xxxxxxxxxxxx" autocomplete="off">
-                    <button type="button" class="btn-icon toggle-password" data-target="setup-token">👁️</button>
-                </div>
-                <small>Nécessite les permissions : gist (read/write)</small>
-            </div>
-            
-            <div class="form-group">
-                <label for="setup-gist-id">ID du Gist (optionnel)</label>
-                <input type="text" id="setup-gist-id" placeholder="Laisser vide pour en créer un nouveau">
-                <small>Si vous avez déjà un Gist RoadLog, entrez son ID ici.</small>
-            </div>
-            
-            <button id="setup-submit" class="btn btn-primary btn-large btn-full">
-                🚀 Démarrer RoadLog
+<!-- ============================================================
+     SETUP SCREEN
+     ============================================================ -->
+<div id="setup-screen" class="setup-container" style="display:none;">
+  <div class="setup-card">
+    <div class="setup-logo">
+      <svg width="48" height="48" viewBox="0 0 24 24" fill="none" stroke="#3b82f6" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 2L2 7l10 5 10-5-10-5z"/><path d="M2 17l10 5 10-5"/><path d="M2 12l10 5 10-5"/></svg>
+      <h1>RoadLog</h1>
+      <p>Configuration initiale</p>
+    </div>
+    <div class="form-group">
+      <label class="form-label">Token GitHub (Personal Access Token)</label>
+      <input type="password" id="setup-token" class="form-input" placeholder="ghp_xxxxxxxxxxxx">
+      <small style="color:var(--text-muted);font-size:0.75rem;margin-top:4px;display:block;">Le token nécessite le scope "gist"</small>
+    </div>
+    <div class="form-group">
+      <label class="form-label">ID du Gist</label>
+      <input type="text" id="setup-gist" class="form-input" placeholder="Identifiant du Gist GitHub">
+      <small style="color:var(--text-muted);font-size:0.75rem;margin-top:4px;display:block;">Laissez vide pour en créer un nouveau</small>
+    </div>
+    <button class="btn btn-primary btn-full btn-lg" onclick="App.setup()">
+      <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M5 12h14M12 5l7 7-7 7"/></svg>
+      Démarrer
+    </button>
+  </div>
+</div>
+
+<!-- ============================================================
+     MAIN APP
+     ============================================================ -->
+<div id="app" style="display:none;">
+
+  <!-- Top Bar -->
+  <header class="topbar">
+    <div style="display:flex;align-items:center;gap:8px;">
+      <button class="hamburger" onclick="App.toggleSidebar()" aria-label="Menu">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><line x1="3" y1="6" x2="21" y2="6"/><line x1="3" y1="12" x2="21" y2="12"/><line x1="3" y1="18" x2="21" y2="18"/></svg>
+      </button>
+      <div class="topbar-logo">
+        <svg viewBox="0 0 24 24" fill="none" stroke="#3b82f6" stroke-width="2" stroke-linecap="round"><path d="M12 2L2 7l10 5 10-5-10-5z"/><path d="M2 17l10 5 10-5"/><path d="M2 12l10 5 10-5"/></svg>
+        <h1>RoadLog</h1>
+      </div>
+    </div>
+    <div class="topbar-actions">
+      <span class="sync-indicator synced" id="sync-status" title="Synchronisé"></span>
+    </div>
+  </header>
+
+  <!-- Sidebar Overlay -->
+  <div class="sidebar-overlay" id="sidebar-overlay" onclick="App.toggleSidebar()"></div>
+
+  <!-- Sidebar -->
+  <nav class="sidebar" id="sidebar">
+    <div class="sidebar-header">
+      <svg width="28" height="28" viewBox="0 0 24 24" fill="none" stroke="#3b82f6" stroke-width="2" stroke-linecap="round"><path d="M12 2L2 7l10 5 10-5-10-5z"/><path d="M2 17l10 5 10-5"/><path d="M2 12l10 5 10-5"/></svg>
+      <h2>RoadLog</h2>
+    </div>
+    <div class="sidebar-nav">
+      <button onclick="App.navigate('dashboard')" data-page="dashboard">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="3" y="3" width="7" height="7" rx="1"/><rect x="14" y="3" width="7" height="7" rx="1"/><rect x="3" y="14" width="7" height="7" rx="1"/><rect x="14" y="14" width="7" height="7" rx="1"/></svg>
+        Tableau de bord
+      </button>
+      <button onclick="App.navigate('new-observation')" data-page="new-observation">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="10"/><line x1="12" y1="8" x2="12" y2="16"/><line x1="8" y1="12" x2="16" y2="12"/></svg>
+        Nouvelle observation
+      </button>
+      <button onclick="App.navigate('history')" data-page="history">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="10"/><polyline points="12 6 12 12 16 14"/></svg>
+        Historique
+      </button>
+      <button onclick="App.navigate('statistics')" data-page="statistics">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><line x1="18" y1="20" x2="18" y2="10"/><line x1="12" y1="20" x2="12" y2="4"/><line x1="6" y1="20" x2="6" y2="14"/></svg>
+        Statistiques
+      </button>
+      <button onclick="App.navigate('map')" data-page="map">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polygon points="1 6 1 22 8 18 16 22 23 18 23 2 16 6 8 2 1 6"/><line x1="8" y1="2" x2="8" y2="18"/><line x1="16" y1="6" x2="16" y2="22"/></svg>
+        Carte
+      </button>
+      <button onclick="App.navigate('favorites')" data-page="favorites">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polygon points="12 2 15.09 8.26 22 9.27 17 14.14 18.18 21.02 12 17.77 5.82 21.02 7 14.14 2 9.27 8.91 8.26 12 2"/></svg>
+        Favoris
+      </button>
+      <button onclick="App.navigate('categories')" data-page="categories">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M4 20h16a2 2 0 002-2V8a2 2 0 00-2-2h-7.93a2 2 0 01-1.66-.9l-.82-1.2A2 2 0 007.93 3H4a2 2 0 00-2 2v13c0 1.1.9 2 2 2z"/></svg>
+        Catégories
+      </button>
+      <button onclick="App.navigate('export')" data-page="export">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M21 15v4a2 2 0 01-2 2H5a2 2 0 01-2-2v-4"/><polyline points="7 10 12 15 17 10"/><line x1="12" y1="15" x2="12" y2="3"/></svg>
+        Export
+      </button>
+      <button onclick="App.navigate('share')" data-page="share">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="18" cy="5" r="3"/><circle cx="6" cy="12" r="3"/><circle cx="18" cy="19" r="3"/><line x1="8.59" y1="13.51" x2="15.42" y2="17.49"/><line x1="15.41" y1="6.51" x2="8.59" y2="10.49"/></svg>
+        Partage / QR Code
+      </button>
+      <button onclick="App.navigate('settings')" data-page="settings">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="3"/><path d="M19.4 15a1.65 1.65 0 00.33 1.82l.06.06a2 2 0 010 2.83 2 2 0 01-2.83 0l-.06-.06a1.65 1.65 0 00-1.82-.33 1.65 1.65 0 00-1 1.51V21a2 2 0 01-4 0v-.09A1.65 1.65 0 009 19.4a1.65 1.65 0 00-1.82.33l-.06.06a2 2 0 01-2.83 0 2 2 0 010-2.83l.06-.06A1.65 1.65 0 004.68 15a1.65 1.65 0 00-1.51-1H3a2 2 0 010-4h.09A1.65 1.65 0 004.6 9a1.65 1.65 0 00-.33-1.82l-.06-.06a2 2 0 012.83-2.83l.06.06A1.65 1.65 0 009 4.68a1.65 1.65 0 001-1.51V3a2 2 0 014 0v.09a1.65 1.65 0 001 1.51 1.65 1.65 0 001.82-.33l.06-.06a2 2 0 012.83 2.83l-.06.06A1.65 1.65 0 0019.4 9a1.65 1.65 0 001.51 1H21a2 2 0 010 4h-.09a1.65 1.65 0 00-1.51 1z"/></svg>
+        Paramètres
+      </button>
+    </div>
+  </nav>
+
+  <!-- Main Content Area -->
+  <main class="main-content" id="main-content">
+
+    <!-- ============ DASHBOARD ============ -->
+    <section class="page active" id="page-dashboard">
+      <h2 style="font-size:1.4rem;font-weight:800;margin-bottom:16px;">Tableau de bord</h2>
+      <div class="stats-grid" id="dashboard-stats"></div>
+      <div class="card" style="margin-top:16px;">
+        <div class="card-title" style="margin-bottom:12px;">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" width="18" height="18"><circle cx="12" cy="12" r="10"/><polyline points="12 6 12 12 16 14"/></svg>
+          Dernière observation
+        </div>
+        <div id="dashboard-last-obs" style="color:var(--text-muted);font-size:0.9rem;">Aucune observation</div>
+      </div>
+      <div class="card">
+        <div class="card-title" style="margin-bottom:12px;">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" width="18" height="18"><path d="M12 20h9"/><path d="M16.5 3.5a2.121 2.121 0 013 3L7 19l-4 1 1-4L16.5 3.5z"/></svg>
+          Plaques les plus fréquentes
+        </div>
+        <div id="dashboard-top-plates" style="color:var(--text-muted);font-size:0.9rem;"></div>
+      </div>
+      <div class="card">
+        <div class="card-title" style="margin-bottom:12px;">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" width="18" height="18"><path d="M10.29 3.86L1.82 18a2 2 0 001.71 3h16.94a2 2 0 001.71-3L13.71 3.86a2 2 0 00-3.42 0z"/><line x1="12" y1="9" x2="12" y2="13"/><line x1="12" y1="17" x2="12.01" y2="17"/></svg>
+          Comportements les plus fréquents
+        </div>
+        <div id="dashboard-top-cats" style="color:var(--text-muted);font-size:0.9rem;"></div>
+      </div>
+      <button class="btn btn-primary btn-full btn-lg" style="margin-top:16px;" onclick="App.navigate('new-observation')">
+        <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="10"/><line x1="12" y1="8" x2="12" y2="16"/><line x1="8" y1="12" x2="16" y2="12"/></svg>
+        Nouvelle observation
+      </button>
+    </section>
+
+    <!-- ============ NEW OBSERVATION ============ -->
+    <section class="page" id="page-new-observation">
+      <h2 style="font-size:1.4rem;font-weight:800;margin-bottom:16px;">Nouvelle observation</h2>
+      <div id="plate-alert-banner"></div>
+      <div class="card">
+        <div class="form-group">
+          <label class="form-label">Plaque d'immatriculation</label>
+          <input type="text" id="obs-plate" class="form-input" placeholder="AB-123-CD" style="font-size:1.3rem;font-weight:700;letter-spacing:0.1em;text-transform:uppercase;text-align:center;" oninput="ObsForm.formatPlate(this); ObsForm.checkPlateAlerts();">
+        </div>
+        <div style="display:grid;grid-template-columns:1fr 1fr;gap:12px;">
+          <div class="form-group">
+            <label class="form-label">Date</label>
+            <input type="date" id="obs-date" class="form-input">
+          </div>
+          <div class="form-group">
+            <label class="form-label">Heure</label>
+            <input type="time" id="obs-time" class="form-input">
+          </div>
+        </div>
+        <div class="form-group">
+          <label class="form-label">Localisation</label>
+          <button class="btn btn-secondary btn-full" onclick="ObsForm.getLocation()" id="btn-geoloc">
+            <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M21 10c0 7-9 13-9 13s-9-6-9-13a9 9 0 0118 0z"/><circle cx="12" cy="10" r="3"/></svg>
+            Utiliser ma position
+          </button>
+          <div id="obs-location-display" style="margin-top:8px;font-size:0.85rem;color:var(--text-muted);"></div>
+          <input type="hidden" id="obs-lat">
+          <input type="hidden" id="obs-lng">
+        </div>
+        <div class="form-group">
+          <label class="form-label">Lieu</label>
+          <input type="text" id="obs-lieu" class="form-input" placeholder="Ex: Autoroute A6, Sortie 12">
+        </div>
+        <div class="form-group">
+          <label class="form-label">Sens de circulation</label>
+          <input type="text" id="obs-direction" class="form-input" placeholder="Ex: Direction Paris">
+        </div>
+        <div class="form-group">
+          <label class="form-label">Catégorie(s) d'observation</label>
+          <div class="chips-container" id="obs-categories"></div>
+        </div>
+        <div class="form-group">
+          <label class="form-label">Notes</label>
+          <textarea id="obs-notes" class="form-textarea" placeholder="Détails supplémentaires..."></textarea>
+        </div>
+        <div class="form-group">
+          <label class="form-label">Photos</label>
+          <div style="display:flex;gap:8px;flex-wrap:wrap;">
+            <button class="btn btn-secondary" onclick="ObsForm.capturePhoto()">
+              <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M23 19a2 2 0 01-2 2H3a2 2 0 01-2-2V8a2 2 0 012-2h4l2-3h6l2 3h4a2 2 0 012 2z"/><circle cx="12" cy="13" r="4"/></svg>
+              Prendre
             </button>
-            
-            <div id="setup-error" class="alert alert-error hidden"></div>
-        </div>
-    </div>
-
-    <!-- ==================== APPLICATION PRINCIPALE ==================== -->
-    <div id="app" class="app hidden">
-        
-        <!-- Overlay du menu -->
-        <div id="menu-overlay" class="menu-overlay"></div>
-        
-        <!-- ========== MENU LATÉRAL ========== -->
-        <nav id="sidebar" class="sidebar">
-            <div class="sidebar-header">
-                <div class="sidebar-logo">🚗</div>
-                <h2>RoadLog</h2>
-                <button id="sidebar-close" class="btn-icon sidebar-close">✕</button>
-            </div>
-            
-            <ul class="sidebar-menu">
-                <li>
-                    <a href="#" data-page="dashboard" class="sidebar-link active">
-                        <span class="sidebar-icon">📊</span>
-                        <span>Tableau de bord</span>
-                    </a>
-                </li>
-                <li>
-                    <a href="#" data-page="new-observation" class="sidebar-link">
-                        <span class="sidebar-icon">➕</span>
-                        <span>Nouvelle observation</span>
-                    </a>
-                </li>
-                <li>
-                    <a href="#" data-page="history" class="sidebar-link">
-                        <span class="sidebar-icon">📋</span>
-                        <span>Historique</span>
-                    </a>
-                </li>
-                <li>
-                    <a href="#" data-page="statistics" class="sidebar-link">
-                        <span class="sidebar-icon">📈</span>
-                        <span>Statistiques</span>
-                    </a>
-                </li>
-                <li>
-                    <a href="#" data-page="map" class="sidebar-link">
-                        <span class="sidebar-icon">🗺️</span>
-                        <span>Carte</span>
-                    </a>
-                </li>
-                <li>
-                    <a href="#" data-page="favorites" class="sidebar-link">
-                        <span class="sidebar-icon">⭐</span>
-                        <span>Favoris</span>
-                    </a>
-                </li>
-                <li class="sidebar-separator"></li>
-                <li>
-                    <a href="#" data-page="categories" class="sidebar-link">
-                        <span class="sidebar-icon">🏷️</span>
-                        <span>Gestion des catégories</span>
-                    </a>
-                </li>
-                <li>
-                    <a href="#" data-page="sharing" class="sidebar-link">
-                        <span class="sidebar-icon">🔗</span>
-                        <span>Partage</span>
-                    </a>
-                </li>
-                <li>
-                    <a href="#" data-page="export" class="sidebar-link">
-                        <span class="sidebar-icon">📤</span>
-                        <span>Export</span>
-                    </a>
-                </li>
-                <li>
-                    <a href="#" data-page="qrcode" class="sidebar-link">
-                        <span class="sidebar-icon">📱</span>
-                        <span>QR Code</span>
-                    </a>
-                </li>
-                <li class="sidebar-separator"></li>
-                <li>
-                    <a href="#" data-page="settings" class="sidebar-link">
-                        <span class="sidebar-icon">⚙️</span>
-                        <span>Paramètres</span>
-                    </a>
-                </li>
-            </ul>
-            
-            <div class="sidebar-footer">
-                <div class="sync-status" id="sync-status">
-                    <span class="sync-dot sync-ok"></span>
-                    <span>Synchronisé</span>
-                </div>
-            </div>
-        </nav>
-
-        <!-- ========== BARRE DE NAVIGATION SUPÉRIEURE ========== -->
-        <header class="topbar">
-            <button id="menu-toggle" class="btn-icon menu-toggle">☰</button>
-            <h1 id="page-title" class="topbar-title">Tableau de bord</h1>
-            <div class="topbar-actions">
-                <button id="sync-btn" class="btn-icon" title="Synchroniser">🔄</button>
-            </div>
-        </header>
-
-        <!-- ========== BANDEAU D'ALERTE ========== -->
-        <div id="alert-banner" class="alert-banner hidden">
-            <span id="alert-banner-text"></span>
-            <button id="alert-banner-close" class="btn-icon">✕</button>
+            <button class="btn btn-secondary" onclick="ObsForm.importPhoto()">
+              <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="3" y="3" width="18" height="18" rx="2" ry="2"/><circle cx="8.5" cy="8.5" r="1.5"/><polyline points="21 15 16 10 5 21"/></svg>
+              Importer
+            </button>
+          </div>
+          <div class="photo-grid" id="obs-photos" style="margin-top:8px;"></div>
+          <input type="file" id="photo-input" accept="image/*" style="display:none;" onchange="ObsForm.handlePhotoFile(event)">
+          <input type="file" id="camera-input" accept="image/*" capture="environment" style="display:none;" onchange="ObsForm.handlePhotoFile(event)">
         </div>
 
-        <!-- ========== CONTENEUR DES PAGES ========== -->
-        <main id="main-content" class="main-content">
+        <!-- Voice recognition button -->
+        <div style="text-align:center;margin:20px 0;">
+          <button class="btn btn-primary btn-lg" onclick="SpeechModule.startRecognition()" id="btn-speech" style="border-radius:50%;width:80px;height:80px;padding:0;">
+            <svg width="32" height="32" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M12 1a3 3 0 00-3 3v8a3 3 0 006 0V4a3 3 0 00-3-3z"/><path d="M19 10v2a7 7 0 01-14 0v-2"/><line x1="12" y1="19" x2="12" y2="23"/><line x1="8" y1="23" x2="16" y2="23"/></svg>
+          </button>
+          <div id="speech-status" style="margin-top:8px;font-size:0.85rem;color:var(--text-muted);">Appuyez pour dicter</div>
+        </div>
 
-            <!-- ===== PAGE : TABLEAU DE BORD ===== -->
-            <section id="page-dashboard" class="page active">
-                <div class="dashboard-grid">
-                    <div class="stat-card stat-total">
-                        <div class="stat-icon">📊</div>
-                        <div class="stat-value" id="stat-total">0</div>
-                        <div class="stat-label">Total</div>
-                    </div>
-                    <div class="stat-card stat-today">
-                        <div class="stat-icon">📅</div>
-                        <div class="stat-value" id="stat-today">0</div>
-                        <div class="stat-label">Aujourd'hui</div>
-                    </div>
-                    <div class="stat-card stat-week">
-                        <div class="stat-icon">📆</div>
-                        <div class="stat-value" id="stat-week">0</div>
-                        <div class="stat-label">Cette semaine</div>
-                    </div>
-                    <div class="stat-card stat-month">
-                        <div class="stat-icon">🗓️</div>
-                        <div class="stat-value" id="stat-month">0</div>
-                        <div class="stat-label">Ce mois</div>
-                    </div>
+        <input type="hidden" id="obs-edit-id">
+        <div style="display:flex;gap:8px;">
+          <button class="btn btn-success btn-full btn-lg" onclick="ObsForm.save()">
+            <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="20 6 9 17 4 12"/></svg>
+            Enregistrer
+          </button>
+        </div>
+      </div>
+    </section>
+
+    <!-- ============ HISTORY ============ -->
+    <section class="page" id="page-history">
+      <h2 style="font-size:1.4rem;font-weight:800;margin-bottom:16px;">Historique</h2>
+      <div class="search-bar">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="11" cy="11" r="8"/><line x1="21" y1="21" x2="16.65" y2="16.65"/></svg>
+        <input type="text" id="history-search" placeholder="Rechercher..." oninput="HistoryModule.render()">
+      </div>
+      <div class="filters-bar">
+        <select id="filter-category" onchange="HistoryModule.render()"><option value="">Toutes catégories</option></select>
+        <input type="date" id="filter-date-from" onchange="HistoryModule.render()" title="Date début">
+        <input type="date" id="filter-date-to" onchange="HistoryModule.render()" title="Date fin">
+      </div>
+      <div class="table-container" id="history-table"></div>
+      <div class="pagination" id="history-pagination"></div>
+    </section>
+
+    <!-- ============ PLATE DETAIL ============ -->
+    <section class="page" id="page-plate-detail">
+      <button class="btn btn-secondary" onclick="App.navigate('history')" style="margin-bottom:16px;">
+        <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><line x1="19" y1="12" x2="5" y2="12"/><polyline points="12 19 5 12 12 5"/></svg>
+        Retour
+      </button>
+      <div id="plate-detail-content"></div>
+    </section>
+
+    <!-- ============ STATISTICS ============ -->
+    <section class="page" id="page-statistics">
+      <h2 style="font-size:1.4rem;font-weight:800;margin-bottom:16px;">Statistiques</h2>
+      <div class="card">
+        <div class="card-title" style="margin-bottom:12px;">Observations par jour (30 derniers jours)</div>
+        <canvas id="chart-daily" height="200"></canvas>
+      </div>
+      <div class="card">
+        <div class="card-title" style="margin-bottom:12px;">Répartition par catégorie</div>
+        <canvas id="chart-categories" height="300"></canvas>
+      </div>
+      <div class="card">
+        <div class="card-title" style="margin-bottom:12px;">Évolution mensuelle</div>
+        <canvas id="chart-monthly" height="200"></canvas>
+      </div>
+      <div class="card">
+        <div class="card-title" style="margin-bottom:12px;">Top 10 des plaques</div>
+        <div id="stats-top-plates"></div>
+      </div>
+    </section>
+
+    <!-- ============ MAP ============ -->
+    <section class="page" id="page-map">
+      <h2 style="font-size:1.4rem;font-weight:800;margin-bottom:16px;">Carte des observations</h2>
+      <div id="map-container"></div>
+    </section>
+
+    <!-- ============ FAVORITES ============ -->
+    <section class="page" id="page-favorites">
+      <h2 style="font-size:1.4rem;font-weight:800;margin-bottom:16px;">Favoris</h2>
+      <div id="favorites-list"></div>
+    </section>
+
+    <!-- ============ CATEGORIES ============ -->
+    <section class="page" id="page-categories">
+      <h2 style="font-size:1.4rem;font-weight:800;margin-bottom:16px;">Gestion des catégories</h2>
+      <div class="card">
+        <div style="display:flex;gap:8px;margin-bottom:16px;">
+          <input type="text" id="new-cat-input" class="form-input" placeholder="Nouvelle catégorie..." style="flex:1;">
+          <button class="btn btn-primary" onclick="CategoriesModule.add()">Ajouter</button>
+        </div>
+        <div id="categories-list"></div>
+      </div>
+    </section>
+
+    <!-- ============ EXPORT ============ -->
+    <section class="page" id="page-export">
+      <h2 style="font-size:1.4rem;font-weight:800;margin-bottom:16px;">Export des données</h2>
+      <div class="card">
+        <p style="color:var(--text-muted);margin-bottom:16px;font-size:0.9rem;">Exportez vos observations dans le format souhaité.</p>
+        <div style="display:flex;flex-direction:column;gap:12px;">
+          <button class="btn btn-primary btn-full" onclick="ExportModule.toCSV()">
+            <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M14 2H6a2 2 0 00-2 2v16a2 2 0 002 2h12a2 2 0 002-2V8z"/><polyline points="14 2 14 8 20 8"/></svg>
+            Exporter en CSV
+          </button>
+          <button class="btn btn-success btn-full" onclick="ExportModule.toExcel()">
+            <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M14 2H6a2 2 0 00-2 2v16a2 2 0 002 2h12a2 2 0 002-2V8z"/><polyline points="14 2 14 8 20 8"/></svg>
+            Exporter en Excel
+          </button>
+          <button class="btn btn-secondary btn-full" onclick="ExportModule.toPDF()">
+            <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M14 2H6a2 2 0 00-2 2v16a2 2 0 002 2h12a2 2 0 002-2V8z"/><polyline points="14 2 14 8 20 8"/></svg>
+            Exporter en PDF
+          </button>
+        </div>
+      </div>
+    </section>
+
+    <!-- ============ SHARE / QR ============ -->
+    <section class="page" id="page-share">
+      <h2 style="font-size:1.4rem;font-weight:800;margin-bottom:16px;">Partage & QR Code</h2>
+      <div class="card">
+        <div class="card-title" style="margin-bottom:12px;">QR Code de l'application</div>
+        <p style="color:var(--text-muted);font-size:0.85rem;margin-bottom:16px;">Partagez ce QR code pour donner accès à l'application.</p>
+        <div id="qr-code" style="display:flex;justify-content:center;margin-bottom:16px;"></div>
+        <div class="card-title" style="margin-bottom:12px;margin-top:24px;">Mode de partage</div>
+        <p style="color:var(--text-muted);font-size:0.85rem;margin-bottom:12px;">
+          <strong>Lecture seule :</strong> Partagez l'ID du Gist pour permettre la consultation.<br>
+          <strong>Édition :</strong> Partagez l'ID du Gist et le token autorisé.
+        </p>
+        <div class="form-group">
+          <label class="form-label">ID du Gist</label>
+          <div style="display:flex;gap:8px;">
+            <input type="text" id="share-gist-id" class="form-input" readonly>
+            <button class="btn btn-secondary" onclick="navigator.clipboard.writeText(document.getElementById('share-gist-id').value);App.toast('ID copié !','success');">Copier</button>
+          </div>
+        </div>
+      </div>
+    </section>
+
+    <!-- ============ SETTINGS ============ -->
+    <section class="page" id="page-settings">
+      <h2 style="font-size:1.4rem;font-weight:800;margin-bottom:16px;">Paramètres</h2>
+      <div class="card">
+        <div class="card-title" style="margin-bottom:16px;">Configuration GitHub</div>
+        <div class="form-group">
+          <label class="form-label">Token GitHub</label>
+          <input type="password" id="settings-token" class="form-input">
+        </div>
+        <div class="form-group">
+          <label class="form-label">ID du Gist</label>
+          <input type="text" id="settings-gist" class="form-input">
+        </div>
+        <button class="btn btn-primary" onclick="SettingsModule.saveGitHub()">Sauvegarder</button>
+      </div>
+      <div class="card">
+        <div class="card-title" style="margin-bottom:16px;">Préférences</div>
+        <div class="form-group">
+          <label class="form-label">Seuil d'alerte (nombre d'observations)</label>
+          <input type="number" id="settings-alert-threshold" class="form-input" value="3" min="1" max="100">
+        </div>
+        <div class="form-group" style="display:flex;align-items:center;justify-content:space-between;">
+          <label class="form-label" style="margin:0;">Géolocalisation automatique</label>
+          <input type="checkbox" id="settings-geo" checked style="width:20px;height:20px;accent-color:var(--accent);">
+        </div>
+        <div class="form-group" style="display:flex;align-items:center;justify-content:space-between;">
+          <label class="form-label" style="margin:0;">Reconnaissance vocale</label>
+          <input type="checkbox" id="settings-speech" checked style="width:20px;height:20px;accent-color:var(--accent);">
+        </div>
+        <div class="form-group" style="display:flex;align-items:center;justify-content:space-between;">
+          <label class="form-label" style="margin:0;">Mode écoute continue</label>
+          <input type="checkbox" id="settings-continuous" style="width:20px;height:20px;accent-color:var(--accent);">
+        </div>
+        <button class="btn btn-primary" onclick="SettingsModule.savePrefs()">Sauvegarder les préférences</button>
+      </div>
+      <div class="card">
+        <div class="card-title" style="margin-bottom:16px;">Données</div>
+        <div style="display:flex;flex-direction:column;gap:8px;">
+          <button class="btn btn-secondary btn-full" onclick="GistSync.forcePull()">
+            <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="1 4 1 10 7 10"/><path d="M3.51 15a9 9 0 102.13-9.36L1 10"/></svg>
+            Resynchroniser depuis GitHub
+          </button>
+          <button class="btn btn-danger btn-full" onclick="if(confirm('Supprimer toutes les données locales ?')){localStorage.clear();location.reload();}">
+            Réinitialiser l'application
+          </button>
+        </div>
+      </div>
+    </section>
+
+  </main>
+
+  <!-- One-Hand Mode Floating Button -->
+  <button class="btn-mega" id="btn-one-hand" title="Appui long pour dicter">
+    <svg width="36" height="36" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M12 1a3 3 0 00-3 3v8a3 3 0 006 0V4a3 3 0 00-3-3z"/><path d="M19 10v2a7 7 0 01-14 0v-2"/><line x1="12" y1="19" x2="12" y2="23"/><line x1="8" y1="23" x2="16" y2="23"/></svg>
+  </button>
+</div>
+
+<!-- ============================================================
+     MODAL (for plate detail, edit, confirm, etc.)
+     ============================================================ -->
+<div class="modal-overlay" id="modal-overlay" onclick="App.closeModal(event)">
+  <div class="modal" id="modal-content"></div>
+</div>
+
+<!-- Toast container -->
+<div id="toast-container"></div>
+
+<!-- ============================================================
+     JAVASCRIPT – Application Core
+     ============================================================ -->
+<script>
+/* ============================================================
+   DEFAULT CATEGORIES
+   ============================================================ */
+const DEFAULT_CATEGORIES = [
+  "Non-respect des distances de sécurité",
+  "Changement de voie dangereux",
+  "Refus de priorité",
+  "Téléphone au volant",
+  "Vitesse manifestement excessive",
+  "Franchissement de feu rouge",
+  "Stop non marqué",
+  "Dépassement dangereux",
+  "Dépassement par la droite",
+  "Dépassement par la gauche",
+  "Queue de poisson",
+  "Clignotant non utilisé",
+  "Circulation sur bande d'arrêt d'urgence",
+  "Stationnement gênant",
+  "Éclairage défectueux",
+  "Comportement agressif",
+  "Autre"
+];
+
+/* ============================================================
+   APP STATE
+   ============================================================ */
+const State = {
+  observations: [],
+  categories: [...DEFAULT_CATEGORIES],
+  favorites: [],
+  config: {
+    token: '',
+    gistId: '',
+    alertThreshold: 3,
+    geoEnabled: true,
+    speechEnabled: true,
+    continuousMode: false
+  },
+  currentPage: 'dashboard',
+  historyPage: 1,
+  historyPageSize: 20,
+  historySortCol: 'date',
+  historySortDir: 'desc',
+  editingObsId: null,
+  charts: {},
+  leafletMap: null,
+  leafletMarkers: null
+};
+
+/* ============================================================
+   APP – Core Module
+   ============================================================ */
+const App = {
+  /** Initialize the application */
+  async init() {
+    // Load config from localStorage
+    const saved = localStorage.getItem('roadlog_config');
+    if (saved) {
+      try { Object.assign(State.config, JSON.parse(saved)); } catch(e) {}
+    }
+
+    // Check if configured
+    if (!State.config.token) {
+      document.getElementById('setup-screen').style.display = 'flex';
+      document.getElementById('app').style.display = 'none';
+      return;
+    }
+
+    document.getElementById('setup-screen').style.display = 'none';
+    document.getElementById('app').style.display = 'flex';
+
+    // Pull data from Gist
+    await GistSync.pull();
+
+    // Render current page
+    this.navigate('dashboard');
+
+    // Setup one-hand button
+    this.setupOneHandButton();
+  },
+
+  /** Initial setup */
+  async setup() {
+    const token = document.getElementById('setup-token').value.trim();
+    const gistId = document.getElementById('setup-gist').value.trim();
+
+    if (!token) { App.toast('Veuillez saisir un token GitHub', 'error'); return; }
+
+    State.config.token = token;
+    State.config.gistId = gistId;
+
+    if (!gistId) {
+      // Create new Gist
+      try {
+        const id = await GistSync.createGist();
+        State.config.gistId = id;
+        App.toast('Gist créé avec succès !', 'success');
+      } catch(e) {
+        App.toast('Erreur lors de la création du Gist: ' + e.message, 'error');
+        return;
+      }
+    }
+
+    localStorage.setItem('roadlog_config', JSON.stringify(State.config));
+    App.init();
+  },
+
+  /** Navigate to a page */
+  navigate(page) {
+    State.currentPage = page;
+    document.querySelectorAll('.page').forEach(p => p.classList.remove('active'));
+    const target = document.getElementById('page-' + page);
+    if (target) target.classList.add('active');
+
+    // Update sidebar active state
+    document.querySelectorAll('.sidebar-nav button').forEach(b => {
+      b.classList.toggle('active', b.dataset.page === page);
+    });
+
+    // Close sidebar on mobile
+    this.closeSidebar();
+
+    // Page-specific init
+    switch(page) {
+      case 'dashboard': DashboardModule.render(); break;
+      case 'new-observation': ObsForm.init(); break;
+      case 'history': HistoryModule.render(); break;
+      case 'statistics': StatsModule.render(); break;
+      case 'map': setTimeout(() => MapModule.render(), 100); break;
+      case 'favorites': FavoritesModule.render(); break;
+      case 'categories': CategoriesModule.render(); break;
+      case 'settings': SettingsModule.load(); break;
+      case 'share': ShareModule.render(); break;
+      case 'export': break;
+    }
+  },
+
+  /** Toggle sidebar */
+  toggleSidebar() {
+    document.getElementById('sidebar').classList.toggle('active');
+    document.getElementById('sidebar-overlay').classList.toggle('active');
+  },
+  closeSidebar() {
+    document.getElementById('sidebar').classList.remove('active');
+    document.getElementById('sidebar-overlay').classList.remove('active');
+  },
+
+  /** Toast notification */
+  toast(message, type = 'info') {
+    const container = document.getElementById('toast-container');
+    const toast = document.createElement('div');
+    toast.className = 'toast ' + type;
+    toast.textContent = message;
+    container.appendChild(toast);
+    setTimeout(() => { toast.style.opacity = '0'; toast.style.transform = 'translateX(100%)'; toast.style.transition = 'all 0.3s'; }, 2500);
+    setTimeout(() => toast.remove(), 3000);
+  },
+
+  /** Show modal */
+  showModal(html) {
+    document.getElementById('modal-content').innerHTML = html;
+    document.getElementById('modal-overlay').classList.add('active');
+  },
+  closeModal(e) {
+    if (e && e.target !== document.getElementById('modal-overlay')) return;
+    document.getElementById('modal-overlay').classList.remove('active');
+  },
+  forceCloseModal() {
+    document.getElementById('modal-overlay').classList.remove('active');
+  },
+
+  /** Set sync indicator */
+  setSyncStatus(status) {
+    const el = document.getElementById('sync-status');
+    el.className = 'sync-indicator ' + status;
+  },
+
+  /** Generate unique ID */
+  generateId() {
+    return Date.now().toString(36) + Math.random().toString(36).substr(2,9);
+  },
+
+  /** Setup one-hand button (long press) */
+  setupOneHandButton() {
+    const btn = document.getElementById('btn-one-hand');
+    let pressTimer = null;
+    let isListening = false;
+
+    const startPress = (e) => {
+      e.preventDefault();
+      pressTimer = setTimeout(() => {
+        isListening = true;
+        btn.classList.add('listening');
+        SpeechModule.startRecognition(true); // one-hand mode
+      }, 400);
+    };
+
+    const endPress = (e) => {
+      e.preventDefault();
+      clearTimeout(pressTimer);
+      if (isListening) {
+        isListening = false;
+        btn.classList.remove('listening');
+        SpeechModule.stopRecognition();
+      } else {
+        // Short press - navigate to new observation
+        App.navigate('new-observation');
+      }
+    };
+
+    btn.addEventListener('mousedown', startPress);
+    btn.addEventListener('mouseup', endPress);
+    btn.addEventListener('mouseleave', endPress);
+    btn.addEventListener('touchstart', startPress, {passive: false});
+    btn.addEventListener('touchend', endPress, {passive: false});
+  }
+};
+
+/* ============================================================
+   GIST SYNC MODULE
+   ============================================================ */
+const GistSync = {
+  /** GitHub API base */
+  apiBase: 'https://api.github.com',
+
+  /** Make authenticated request */
+  async request(url, options = {}) {
+    const headers = {
+      'Authorization': 'token ' + State.config.token,
+      'Accept': 'application/vnd.github.v3+json',
+      'Content-Type': 'application/json',
+      ...options.headers
+    };
+    App.setSyncStatus('syncing');
+    try {
+      const resp = await fetch(url, { ...options, headers });
+      if (!resp.ok) {
+        throw new Error(`HTTP ${resp.status}: ${resp.statusText}`);
+      }
+      App.setSyncStatus('synced');
+      return resp;
+    } catch(e) {
+      App.setSyncStatus('error');
+      throw e;
+    }
+  },
+
+  /** Create a new Gist */
+  async createGist() {
+    const data = {
+      description: 'RoadLog - Observations routières',
+      public: false,
+      files: {
+        'roadlog_data.json': {
+          content: JSON.stringify({
+            observations: [],
+            categories: [...DEFAULT_CATEGORIES],
+            favorites: [],
+            version: 1,
+            lastModified: new Date().toISOString()
+          }, null, 2)
+        }
+      }
+    };
+    const resp = await this.request(this.apiBase + '/gists', {
+      method: 'POST',
+      body: JSON.stringify(data)
+    });
+    const json = await resp.json();
+    return json.id;
+  },
+
+  /** Pull data from Gist */
+  async pull() {
+    if (!State.config.gistId) return;
+    try {
+      const resp = await this.request(this.apiBase + '/gists/' + State.config.gistId);
+      const json = await resp.json();
+      const content = json.files['roadlog_data.json']?.content;
+      if (content) {
+        const data = JSON.parse(content);
+        State.observations = data.observations || [];
+        State.categories = data.categories || [...DEFAULT_CATEGORIES];
+        State.favorites = data.favorites || [];
+      }
+    } catch(e) {
+      console.error('Pull error:', e);
+      App.toast('Erreur de synchronisation: ' + e.message, 'error');
+    }
+  },
+
+  /** Push data to Gist */
+  async push() {
+    if (!State.config.gistId) return;
+    try {
+      const data = {
+        observations: State.observations,
+        categories: State.categories,
+        favorites: State.favorites,
+        version: 1,
+        lastModified: new Date().toISOString()
+      };
+      await this.request(this.apiBase + '/gists/' + State.config.gistId, {
+        method: 'PATCH',
+        body: JSON.stringify({
+          files: {
+            'roadlog_data.json': {
+              content: JSON.stringify(data, null, 2)
+            }
+          }
+        })
+      });
+    } catch(e) {
+      console.error('Push error:', e);
+      App.toast('Erreur de synchronisation: ' + e.message, 'error');
+    }
+  },
+
+  /** Force pull */
+  async forcePull() {
+    await this.pull();
+    App.toast('Données synchronisées !', 'success');
+    App.navigate(State.currentPage);
+  }
+};
+
+/* ============================================================
+   DASHBOARD MODULE
+   ============================================================ */
+const DashboardModule = {
+  render() {
+    const obs = State.observations;
+    const now = new Date();
+    const today = now.toISOString().slice(0,10);
+    const weekAgo = new Date(now - 7*24*60*60*1000).toISOString().slice(0,10);
+    const monthStart = now.toISOString().slice(0,7);
+
+    const todayCount = obs.filter(o => o.date === today).length;
+    const weekCount = obs.filter(o => o.date >= weekAgo).length;
+    const monthCount = obs.filter(o => o.date && o.date.startsWith(monthStart)).length;
+
+    document.getElementById('dashboard-stats').innerHTML = `
+      <div class="stat-card"><div class="stat-value">${obs.length}</div><div class="stat-label">Total</div></div>
+      <div class="stat-card"><div class="stat-value">${todayCount}</div><div class="stat-label">Aujourd'hui</div></div>
+      <div class="stat-card"><div class="stat-value">${weekCount}</div><div class="stat-label">Cette semaine</div></div>
+      <div class="stat-card"><div class="stat-value">${monthCount}</div><div class="stat-label">Ce mois</div></div>
+    `;
+
+    // Last observation
+    const last = obs.length > 0 ? obs[obs.length - 1] : null;
+    document.getElementById('dashboard-last-obs').innerHTML = last ?
+      `<span class="plate-badge" onclick="PlateDetail.show('${this.esc(last.plate)}')">${this.esc(last.plate)}</span> &mdash; ${last.date} ${last.time} &mdash; ${(last.categories||[]).join(', ')}` :
+      'Aucune observation enregistrée';
+
+    // Top plates
+    const plateCounts = {};
+    obs.forEach(o => { plateCounts[o.plate] = (plateCounts[o.plate]||0)+1; });
+    const topPlates = Object.entries(plateCounts).sort((a,b) => b[1]-a[1]).slice(0,5);
+    document.getElementById('dashboard-top-plates').innerHTML = topPlates.length > 0 ?
+      topPlates.map(([p,c]) => `<span class="plate-badge" onclick="PlateDetail.show('${this.esc(p)}')" style="margin:4px;">${this.esc(p)}</span> <small style="color:var(--text-muted);">(${c})</small>`).join(' ') :
+      'Aucune donnée';
+
+    // Top categories
+    const catCounts = {};
+    obs.forEach(o => (o.categories||[]).forEach(c => { catCounts[c] = (catCounts[c]||0)+1; }));
+    const topCats = Object.entries(catCounts).sort((a,b) => b[1]-a[1]).slice(0,5);
+    document.getElementById('dashboard-top-cats').innerHTML = topCats.length > 0 ?
+      topCats.map(([c,n]) => `<span class="chip selected" style="cursor:default;">${this.esc(c)} (${n})</span>`).join('') :
+      'Aucune donnée';
+  },
+
+  esc(str) { const d=document.createElement('div'); d.textContent=str; return d.innerHTML; }
+};
+
+/* ============================================================
+   OBSERVATION FORM MODULE
+   ============================================================ */
+const ObsForm = {
+  photos: [],
+  selectedCategories: [],
+
+  /** Initialize form */
+  init(obsData) {
+    const now = new Date();
+    if (obsData) {
+      // Editing
+      document.getElementById('obs-plate').value = obsData.plate || '';
+      document.getElementById('obs-date').value = obsData.date || '';
+      document.getElementById('obs-time').value = obsData.time || '';
+      document.getElementById('obs-lat').value = obsData.lat || '';
+      document.getElementById('obs-lng').value = obsData.lng || '';
+      document.getElementById('obs-lieu').value = obsData.lieu || '';
+      document.getElementById('obs-direction').value = obsData.direction || '';
+      document.getElementById('obs-notes').value = obsData.notes || '';
+      document.getElementById('obs-edit-id').value = obsData.id || '';
+      document.getElementById('obs-location-display').textContent = obsData.address || (obsData.lat ? `${obsData.lat}, ${obsData.lng}` : '');
+      this.photos = obsData.photos || [];
+      this.selectedCategories = [...(obsData.categories || [])];
+      State.editingObsId = obsData.id;
+    } else {
+      // New observation
+      document.getElementById('obs-plate').value = '';
+      document.getElementById('obs-date').value = now.toISOString().slice(0,10);
+      document.getElementById('obs-time').value = now.toTimeString().slice(0,5);
+      document.getElementById('obs-lat').value = '';
+      document.getElementById('obs-lng').value = '';
+      document.getElementById('obs-lieu').value = '';
+      document.getElementById('obs-direction').value = '';
+      document.getElementById('obs-notes').value = '';
+      document.getElementById('obs-edit-id').value = '';
+      document.getElementById('obs-location-display').textContent = '';
+      this.photos = [];
+      this.selectedCategories = [];
+      State.editingObsId = null;
+
+      // Auto geolocation
+      if (State.config.geoEnabled) {
+        this.getLocation();
+      }
+    }
+    document.getElementById('plate-alert-banner').innerHTML = '';
+    this.renderCategories();
+    this.renderPhotos();
+  },
+
+  /** Render category chips */
+  renderCategories() {
+    const container = document.getElementById('obs-categories');
+    container.innerHTML = State.categories.map(cat => {
+      const selected = this.selectedCategories.includes(cat) ? 'selected' : '';
+      return `<div class="chip ${selected}" onclick="ObsForm.toggleCategory('${cat.replace(/'/g,"\\'")}')">${cat}</div>`;
+    }).join('');
+  },
+
+  /** Toggle category selection */
+  toggleCategory(cat) {
+    const idx = this.selectedCategories.indexOf(cat);
+    if (idx >= 0) this.selectedCategories.splice(idx, 1);
+    else this.selectedCategories.push(cat);
+    this.renderCategories();
+  },
+
+  /** Format plate input (XX-000-XX) */
+  formatPlate(input) {
+    let val = input.value.toUpperCase().replace(/[^A-Z0-9]/g, '');
+    if (val.length > 2) val = val.slice(0,2) + '-' + val.slice(2);
+    if (val.length > 6) val = val.slice(0,6) + '-' + val.slice(6);
+    if (val.length > 9) val = val.slice(0,9);
+    input.value = val;
+  },
+
+  /** Check plate alerts */
+  checkPlateAlerts() {
+    const plate = document.getElementById('obs-plate').value.trim();
+    if (!plate || plate.length < 7) {
+      document.getElementById('plate-alert-banner').innerHTML = '';
+      return;
+    }
+    const count = State.observations.filter(o => o.plate === plate).length;
+    const threshold = State.config.alertThreshold || 3;
+    if (count >= threshold) {
+      document.getElementById('plate-alert-banner').innerHTML =
+        `<div class="alert-banner warning">
+          <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M10.29 3.86L1.82 18a2 2 0 001.71 3h16.94a2 2 0 001.71-3L13.71 3.86a2 2 0 00-3.42 0z"/><line x1="12" y1="9" x2="12" y2="13"/><line x1="12" y1="17" x2="12.01" y2="17"/></svg>
+          Cette plaque possède déjà ${count} observation${count>1?'s':''}.
+        </div>`;
+    } else {
+      document.getElementById('plate-alert-banner').innerHTML = '';
+    }
+  },
+
+  /** Geolocation */
+  getLocation() {
+    if (!navigator.geolocation) {
+      App.toast('Géolocalisation non supportée', 'error');
+      return;
+    }
+    document.getElementById('btn-geoloc').textContent = 'Localisation en cours...';
+    navigator.geolocation.getCurrentPosition(
+      async (pos) => {
+        document.getElementById('obs-lat').value = pos.coords.latitude;
+        document.getElementById('obs-lng').value = pos.coords.longitude;
+        // Reverse geocode
+        try {
+          const resp = await fetch(`https://nominatim.openstreetmap.org/reverse?format=json&lat=${pos.coords.latitude}&lon=${pos.coords.longitude}`);
+          const data = await resp.json();
+          const addr = data.display_name || `${pos.coords.latitude.toFixed(5)}, ${pos.coords.longitude.toFixed(5)}`;
+          document.getElementById('obs-location-display').textContent = addr;
+          document.getElementById('btn-geoloc').innerHTML = '<svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M21 10c0 7-9 13-9 13s-9-6-9-13a9 9 0 0118 0z"/><circle cx="12" cy="10" r="3"/></svg> Position obtenue ✓';
+        } catch(e) {
+          document.getElementById('obs-location-display').textContent = `${pos.coords.latitude.toFixed(5)}, ${pos.coords.longitude.toFixed(5)}`;
+          document.getElementById('btn-geoloc').innerHTML = '<svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M21 10c0 7-9 13-9 13s-9-6-9-13a9 9 0 0118 0z"/><circle cx="12" cy="10" r="3"/></svg> Position obtenue ✓';
+        }
+      },
+      (err) => {
+        App.toast('Erreur géolocalisation: ' + err.message, 'error');
+        document.getElementById('btn-geoloc').innerHTML = '<svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M21 10c0 7-9 13-9 13s-9-6-9-13a9 9 0 0118 0z"/><circle cx="12" cy="10" r="3"/></svg> Utiliser ma position';
+      },
+      { enableHighAccuracy: true, timeout: 10000 }
+    );
+  },
+
+  /** Capture photo */
+  capturePhoto() {
+    document.getElementById('camera-input').click();
+  },
+
+  /** Import photo */
+  importPhoto() {
+    document.getElementById('photo-input').click();
+  },
+
+  /** Handle photo file */
+  handlePhotoFile(event) {
+    const file = event.target.files[0];
+    if (!file) return;
+    this.compressImage(file, (base64) => {
+      this.photos.push(base64);
+      this.renderPhotos();
+    });
+    event.target.value = '';
+  },
+
+  /** Compress image */
+  compressImage(file, callback) {
+    const reader = new FileReader();
+    reader.onload = (e) => {
+      const img = new Image();
+      img.onload = () => {
+        const canvas = document.createElement('canvas');
+        const maxSize = 800;
+        let w = img.width, h = img.height;
+        if (w > maxSize || h > maxSize) {
+          if (w > h) { h = h * maxSize / w; w = maxSize; }
+          else { w = w * maxSize / h; h = maxSize; }
+        }
+        canvas.width = w; canvas.height = h;
+        canvas.getContext('2d').drawImage(img, 0, 0, w, h);
+        callback(canvas.toDataURL('image/jpeg', 0.6));
+      };
+      img.src = e.target.result;
+    };
+    reader.readAsDataURL(file);
+  },
+
+  /** Render photo thumbnails */
+  renderPhotos() {
+    const container = document.getElementById('obs-photos');
+    container.innerHTML = this.photos.map((p, i) =>
+      `<div style="position:relative;display:inline-block;">
+        <img src="${p}" class="photo-thumb" onclick="App.showModal('<img src=\\'${p}\\' style=\\'max-width:100%;border-radius:8px;\\'>')">
+        <button onclick="ObsForm.removePhoto(${i})" style="position:absolute;top:-6px;right:-6px;width:22px;height:22px;border-radius:50%;background:var(--danger);color:#fff;border:none;cursor:pointer;font-size:0.7rem;display:flex;align-items:center;justify-content:center;">✕</button>
+      </div>`
+    ).join('');
+  },
+
+  /** Remove photo */
+  removePhoto(index) {
+    this.photos.splice(index, 1);
+    this.renderPhotos();
+  },
+
+  /** Save observation */
+  async save() {
+    const plate = document.getElementById('obs-plate').value.trim().toUpperCase();
+    if (!plate) { App.toast('Veuillez saisir une plaque', 'error'); return; }
+
+    const obs = {
+      id: State.editingObsId || App.generateId(),
+      plate: plate,
+      date: document.getElementById('obs-date').value,
+      time: document.getElementById('obs-time').value,
+      lat: parseFloat(document.getElementById('obs-lat').value) || null,
+      lng: parseFloat(document.getElementById('obs-lng').value) || null,
+      address: document.getElementById('obs-location-display').textContent,
+      lieu: document.getElementById('obs-lieu').value.trim(),
+      direction: document.getElementById('obs-direction').value.trim(),
+      categories: [...this.selectedCategories],
+      notes: document.getElementById('obs-notes').value.trim(),
+      photos: [...this.photos],
+      createdAt: State.editingObsId ?
+        (State.observations.find(o=>o.id===State.editingObsId)?.createdAt || new Date().toISOString()) :
+        new Date().toISOString(),
+      updatedAt: new Date().toISOString()
+    };
+
+    // Check for duplicates (same plate, same date, same time)
+    if (!State.editingObsId) {
+      const dup = State.observations.find(o => o.plate === obs.plate && o.date === obs.date && o.time === obs.time);
+      if (dup) {
+        if (!confirm('Une observation identique existe déjà. Continuer ?')) return;
+      }
+    }
+
+    if (State.editingObsId) {
+      const idx = State.observations.findIndex(o => o.id === State.editingObsId);
+      if (idx >= 0) State.observations[idx] = obs;
+    } else {
+      State.observations.push(obs);
+    }
+
+    await GistSync.push();
+    App.toast(State.editingObsId ? 'Observation modifiée !' : 'Observation enregistrée !', 'success');
+    State.editingObsId = null;
+    App.navigate('dashboard');
+  }
+};
+
+/* ============================================================
+   HISTORY MODULE
+   ============================================================ */
+const HistoryModule = {
+  render() {
+    this.populateFilters();
+    let obs = [...State.observations];
+
+    // Search
+    const search = (document.getElementById('history-search')?.value || '').toLowerCase();
+    if (search) {
+      obs = obs.filter(o =>
+        o.plate.toLowerCase().includes(search) ||
+        (o.lieu||'').toLowerCase().includes(search) ||
+        (o.notes||'').toLowerCase().includes(search) ||
+        (o.categories||[]).join(' ').toLowerCase().includes(search)
+      );
+    }
+
+    // Filter by category
+    const catFilter = document.getElementById('filter-category')?.value;
+    if (catFilter) {
+      obs = obs.filter(o => (o.categories||[]).includes(catFilter));
+    }
+
+    // Filter by date range
+    const dateFrom = document.getElementById('filter-date-from')?.value;
+    const dateTo = document.getElementById('filter-date-to')?.value;
+    if (dateFrom) obs = obs.filter(o => o.date >= dateFrom);
+    if (dateTo) obs = obs.filter(o => o.date <= dateTo);
+
+    // Sort
+    obs.sort((a, b) => {
+      let va = a[State.historySortCol] || '';
+      let vb = b[State.historySortCol] || '';
+      if (State.historySortCol === 'date') {
+        va = (a.date||'') + (a.time||'');
+        vb = (b.date||'') + (b.time||'');
+      }
+      if (typeof va === 'string') va = va.toLowerCase();
+      if (typeof vb === 'string') vb = vb.toLowerCase();
+      const cmp = va < vb ? -1 : va > vb ? 1 : 0;
+      return State.historySortDir === 'asc' ? cmp : -cmp;
+    });
+
+    // Pagination
+    const total = obs.length;
+    const totalPages = Math.max(1, Math.ceil(total / State.historyPageSize));
+    if (State.historyPage > totalPages) State.historyPage = totalPages;
+    const start = (State.historyPage - 1) * State.historyPageSize;
+    const pageObs = obs.slice(start, start + State.historyPageSize);
+
+    // Render table
+    const esc = (s) => { const d=document.createElement('div'); d.textContent=s; return d.innerHTML; };
+    const sortIcon = (col) => State.historySortCol === col ? (State.historySortDir === 'asc' ? ' ↑' : ' ↓') : '';
+
+    document.getElementById('history-table').innerHTML = `
+      <table>
+        <thead><tr>
+          <th onclick="HistoryModule.sort('plate')">Plaque${sortIcon('plate')}</th>
+          <th onclick="HistoryModule.sort('date')">Date${sortIcon('date')}</th>
+          <th onclick="HistoryModule.sort('time')" style="display:none;" class="hide-mobile">Heure${sortIcon('time')}</th>
+          <th>Catégories</th>
+          <th class="hide-mobile">Lieu</th>
+          <th>Actions</th>
+        </tr></thead>
+        <tbody>
+          ${pageObs.length === 0 ? '<tr><td colspan="6" style="text-align:center;color:var(--text-muted);padding:24px;">Aucune observation</td></tr>' : ''}
+          ${pageObs.map(o => `
+            <tr>
+              <td><span class="plate-badge" onclick="PlateDetail.show('${esc(o.plate)}')">${esc(o.plate)}</span></td>
+              <td style="white-space:nowrap;">${esc(o.date)}<br><small style="color:var(--text-muted);">${esc(o.time)}</small></td>
+              <td style="display:none;">${esc(o.time)}</td>
+              <td><div style="display:flex;flex-wrap:wrap;gap:4px;">${(o.categories||[]).map(c => `<span style="font-size:0.7rem;padding:2px 8px;background:var(--bg-primary);border-radius:10px;color:var(--text-secondary);">${esc(c)}</span>`).join('')}</div></td>
+              <td class="hide-mobile" style="font-size:0.8rem;color:var(--text-muted);">${esc(o.lieu||'')}</td>
+              <td>
+                <div style="display:flex;gap:4px;">
+                  <button class="btn-icon btn-secondary" onclick="HistoryModule.edit('${o.id}')" title="Modifier">
+                    <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M11 4H4a2 2 0 00-2 2v14a2 2 0 002 2h14a2 2 0 002-2v-7"/><path d="M18.5 2.5a2.121 2.121 0 013 3L12 15l-4 1 1-4 9.5-9.5z"/></svg>
+                  </button>
+                  <button class="btn-icon btn-secondary" onclick="HistoryModule.duplicate('${o.id}')" title="Dupliquer">
+                    <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="9" y="9" width="13" height="13" rx="2" ry="2"/><path d="M5 15H4a2 2 0 01-2-2V4a2 2 0 012-2h9a2 2 0 012 2v1"/></svg>
+                  </button>
+                  <button class="btn-icon" style="background:rgba(239,68,68,0.15);color:var(--danger);" onclick="HistoryModule.delete('${o.id}')" title="Supprimer">
+                    <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="3 6 5 6 21 6"/><path d="M19 6v14a2 2 0 01-2 2H7a2 2 0 01-2-2V6m3 0V4a2 2 0 012-2h4a2 2 0 012 2v2"/></svg>
+                  </button>
                 </div>
+              </td>
+            </tr>
+          `).join('')}
+        </tbody>
+      </table>
+    `;
 
-                <div class="card" id="last-observation-card">
-                    <h3>🕐 Dernière observation</h3>
-                    <div id="last-observation-content">
-                        <p class="text-muted">Aucune observation enregistrée.</p>
-                    </div>
-                </div>
+    // Pagination
+    let pagHtml = '';
+    pagHtml += `<button onclick="HistoryModule.goPage(${State.historyPage-1})" ${State.historyPage<=1?'disabled':''}>‹</button>`;
+    for (let i = 1; i <= totalPages; i++) {
+      if (totalPages > 7 && Math.abs(i - State.historyPage) > 2 && i !== 1 && i !== totalPages) {
+        if (i === 2 || i === totalPages - 1) pagHtml += `<button disabled>…</button>`;
+        continue;
+      }
+      pagHtml += `<button onclick="HistoryModule.goPage(${i})" class="${i===State.historyPage?'active':''}">${i}</button>`;
+    }
+    pagHtml += `<button onclick="HistoryModule.goPage(${State.historyPage+1})" ${State.historyPage>=totalPages?'disabled':''}>›</button>`;
+    document.getElementById('history-pagination').innerHTML = pagHtml;
+  },
 
-                <div class="card">
-                    <h3>🔢 Plaques les plus fréquentes</h3>
-                    <div id="top-plates-content">
-                        <p class="text-muted">Aucune donnée disponible.</p>
-                    </div>
-                </div>
+  populateFilters() {
+    const sel = document.getElementById('filter-category');
+    const current = sel.value;
+    sel.innerHTML = '<option value="">Toutes catégories</option>' +
+      State.categories.map(c => `<option value="${c}" ${c===current?'selected':''}>${c}</option>`).join('');
+  },
 
-                <div class="card">
-                    <h3>⚠️ Comportements les plus fréquents</h3>
-                    <div id="top-categories-content">
-                        <p class="text-muted">Aucune donnée disponible.</p>
-                    </div>
-                </div>
+  sort(col) {
+    if (State.historySortCol === col) {
+      State.historySortDir = State.historySortDir === 'asc' ? 'desc' : 'asc';
+    } else {
+      State.historySortCol = col;
+      State.historySortDir = 'asc';
+    }
+    this.render();
+  },
 
-                <button id="btn-new-obs-dashboard" class="btn btn-primary btn-large btn-full btn-new-obs">
-                    ➕ Nouvelle observation
-                </button>
-            </section>
+  goPage(p) {
+    State.historyPage = p;
+    this.render();
+  },
 
-            <!-- ===== PAGE : NOUVELLE OBSERVATION ===== -->
-            <section id="page-new-observation" class="page">
-                <form id="observation-form" class="observation-form">
-                    <!-- ID caché pour l'édition -->
-                    <input type="hidden" id="obs-id" value="">
-                    
-                    <!-- MODE UNE MAIN -->
-                    <div class="one-hand-mode">
-                        <button type="button" id="btn-one-hand" class="btn-one-hand" title="Maintenir pour dicter">
-                            <span class="one-hand-icon">🎤</span>
-                            <span class="one-hand-label">Maintenir pour dicter</span>
-                        </button>
-                    </div>
+  edit(id) {
+    const obs = State.observations.find(o => o.id === id);
+    if (!obs) return;
+    App.navigate('new-observation');
+    setTimeout(() => ObsForm.init(obs), 50);
+  },
 
-                    <!-- Plaque d'immatriculation -->
-                    <div class="form-group">
-                        <label for="obs-plate">Plaque d'immatriculation</label>
-                        <div class="input-with-icon">
-                            <input type="text" id="obs-plate" placeholder="AB-123-CD" 
-                                   class="input-plate" autocomplete="off" maxlength="10">
-                            <button type="button" class="btn-icon btn-voice-plate" title="Dicter la plaque">🎤</button>
-                        </div>
-                        <div id="plate-alert" class="plate-alert hidden"></div>
-                    </div>
+  async duplicate(id) {
+    const obs = State.observations.find(o => o.id === id);
+    if (!obs) return;
+    const newObs = { ...obs, id: App.generateId(), createdAt: new Date().toISOString(), updatedAt: new Date().toISOString() };
+    State.observations.push(newObs);
+    await GistSync.push();
+    App.toast('Observation dupliquée !', 'success');
+    this.render();
+  },
 
-                    <!-- Date et heure -->
-                    <div class="form-row">
-                        <div class="form-group flex-1">
-                            <label for="obs-date">Date</label>
-                            <input type="date" id="obs-date">
-                        </div>
-                        <div class="form-group flex-1">
-                            <label for="obs-time">Heure</label>
-                            <input type="time" id="obs-time">
-                        </div>
-                    </div>
+  async delete(id) {
+    if (!confirm('Supprimer cette observation ?')) return;
+    State.observations = State.observations.filter(o => o.id !== id);
+    await GistSync.push();
+    App.toast('Observation supprimée', 'success');
+    this.render();
+  }
+};
 
-                    <!-- Localisation -->
-                    <div class="form-group">
-                        <label>Localisation</label>
-                        <button type="button" id="btn-geoloc" class="btn btn-secondary btn-full">
-                            📍 Utiliser ma position
-                        </button>
-                        <div id="geoloc-result" class="geoloc-result hidden">
-                            <span id="geoloc-address"></span>
-                            <input type="hidden" id="obs-lat">
-                            <input type="hidden" id="obs-lng">
-                        </div>
-                    </div>
+/* ============================================================
+   PLATE DETAIL MODULE
+   ============================================================ */
+const PlateDetail = {
+  show(plate) {
+    const obs = State.observations.filter(o => o.plate === plate);
+    if (obs.length === 0) return;
 
-                    <!-- Lieu -->
-                    <div class="form-group">
-                        <label for="obs-location">Lieu</label>
-                        <input type="text" id="obs-location" placeholder="Ex: Boulevard Haussmann, Paris">
-                    </div>
+    const esc = (s) => { const d=document.createElement('div'); d.textContent=s; return d.innerHTML; };
+    const isFav = State.favorites.includes(plate);
+    const catCounts = {};
+    obs.forEach(o => (o.categories||[]).forEach(c => { catCounts[c] = (catCounts[c]||0)+1; }));
+    const sorted = obs.sort((a,b) => (a.date+a.time).localeCompare(b.date+b.time));
+    const photos = obs.flatMap(o => o.photos || []);
 
-                    <!-- Sens de circulation -->
-                    <div class="form-group">
-                        <label for="obs-direction">Sens de circulation</label>
-                        <input type="text" id="obs-direction" placeholder="Ex: Direction Nord">
-                    </div>
+    const html = `
+      <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:16px;">
+        <h2 style="font-size:1.6rem;font-weight:800;letter-spacing:0.1em;">${esc(plate)}</h2>
+        <button class="star-btn" onclick="FavoritesModule.toggle('${esc(plate)}');PlateDetail.show('${esc(plate)}');">${isFav ? '⭐' : '☆'}</button>
+      </div>
+      <div class="stats-grid" style="margin-bottom:16px;">
+        <div class="stat-card"><div class="stat-value">${obs.length}</div><div class="stat-label">Observations</div></div>
+        <div class="stat-card"><div class="stat-value">${sorted[0]?.date||'-'}</div><div class="stat-label">Première</div></div>
+        <div class="stat-card"><div class="stat-value">${sorted[sorted.length-1]?.date||'-'}</div><div class="stat-label">Dernière</div></div>
+      </div>
+      <div style="margin-bottom:16px;">
+        <strong style="font-size:0.85rem;color:var(--text-muted);text-transform:uppercase;">Répartition</strong>
+        <div style="margin-top:8px;">${Object.entries(catCounts).map(([c,n]) => `<span class="chip selected" style="cursor:default;margin:2px;">${esc(c)} (${n})</span>`).join('')}</div>
+      </div>
+      ${photos.length > 0 ? `<div style="margin-bottom:16px;"><strong style="font-size:0.85rem;color:var(--text-muted);text-transform:uppercase;">Photos</strong><div class="photo-grid" style="margin-top:8px;">${photos.map(p => `<img src="${p}" class="photo-thumb" onclick="App.showModal('<img src=\\'${p}\\' style=\\'max-width:100%;border-radius:8px;\\'>')">`).join('')}</div></div>` : ''}
+      <div>
+        <strong style="font-size:0.85rem;color:var(--text-muted);text-transform:uppercase;">Historique complet</strong>
+        <div style="margin-top:8px;">
+          ${sorted.map(o => `
+            <div style="padding:10px;border-bottom:1px solid var(--border);font-size:0.85rem;">
+              <div style="display:flex;justify-content:space-between;"><span>${esc(o.date)} ${esc(o.time)}</span><span style="color:var(--text-muted);">${esc(o.lieu||'')}</span></div>
+              <div style="margin-top:4px;">${(o.categories||[]).map(c => `<span style="font-size:0.7rem;padding:2px 8px;background:var(--bg-primary);border-radius:10px;color:var(--text-secondary);margin-right:4px;">${esc(c)}</span>`).join('')}</div>
+              ${o.notes ? `<div style="margin-top:4px;color:var(--text-muted);font-size:0.8rem;">${esc(o.notes)}</div>` : ''}
+            </div>
+          `).join('')}
+        </div>
+      </div>
+    `;
 
-                    <!-- Catégories -->
-                    <div class="form-group">
-                        <label>Catégorie(s) d'observation</label>
-                        <div id="categories-container" class="categories-grid">
-                            <!-- Rempli dynamiquement -->
-                        </div>
-                    </div>
+    // Show in plate detail page
+    document.getElementById('plate-detail-content').innerHTML = html;
+    App.navigate('plate-detail');
+  }
+};
 
-                    <!-- Notes -->
-                    <div class="form-group">
-                        <label for="obs-notes">Notes</label>
-                        <div class="input-with-icon textarea-with-icon">
-                            <textarea id="obs-notes" rows="4" placeholder="Détails supplémentaires..."></textarea>
-                            <button type="button" class="btn-icon btn-voice-notes" title="Dicter les notes">🎤</button>
-                        </div>
-                    </div>
+/* ============================================================
+   STATISTICS MODULE
+   ============================================================ */
+const StatsModule = {
+  render() {
+    this.renderDailyChart();
+    this.renderCategoryChart();
+    this.renderMonthlyChart();
+    this.renderTopPlates();
+  },
 
-                    <!-- Photos -->
-                    <div class="form-group">
-                        <label>Photos</label>
-                        <div class="photo-actions">
-                            <button type="button" id="btn-take-photo" class="btn btn-secondary">
-                                📸 Prendre une photo
-                            </button>
-                            <button type="button" id="btn-import-photo" class="btn btn-secondary">
-                                🖼️ Importer
-                            </button>
-                        </div>
-                        <input type="file" id="photo-input" accept="image/*" multiple class="hidden">
-                        <input type="file" id="camera-input" accept="image/*" capture="environment" class="hidden">
-                        <div id="photos-preview" class="photos-preview"></div>
-                    </div>
+  renderDailyChart() {
+    const canvas = document.getElementById('chart-daily');
+    if (State.charts.daily) State.charts.daily.destroy();
 
-                    <!-- Boutons d'action -->
-                    <div class="form-actions">
-                        <button type="submit" class="btn btn-primary btn-large btn-full">
-                            💾 Enregistrer l'observation
-                        </button>
-                        <button type="button" id="btn-cancel-obs" class="btn btn-ghost btn-full">
-                            Annuler
-                        </button>
-                    </div>
-                </form>
-            </section>
+    const days = [];
+    const now = new Date();
+    for (let i = 29; i >= 0; i--) {
+      const d = new Date(now - i*24*60*60*1000);
+      days.push(d.toISOString().slice(0,10));
+    }
 
-            <!-- ===== PAGE : HISTORIQUE ===== -->
-            <section id="page-history" class="page">
-                <div class="search-bar">
-                    <input type="text" id="history-search" placeholder="🔍 Rechercher une plaque, un lieu...">
-                </div>
-                
-                <div class="filters-bar">
-                    <button type="button" class="btn btn-small btn-filter" id="btn-filter-toggle">
-                        🔽 Filtres
-                    </button>
-                    <div id="filters-panel" class="filters-panel hidden">
-                        <div class="form-row">
-                            <div class="form-group flex-1">
-                                <label for="filter-date-start">Du</label>
-                                <input type="date" id="filter-date-start">
-                            </div>
-                            <div class="form-group flex-1">
-                                <label for="filter-date-end">Au</label>
-                                <input type="date" id="filter-date-end">
-                            </div>
-                        </div>
-                        <div class="form-group">
-                            <label for="filter-category">Catégorie</label>
-                            <select id="filter-category">
-                                <option value="">Toutes</option>
-                            </select>
-                        </div>
-                        <div class="form-group">
-                            <label for="filter-plate">Plaque</label>
-                            <input type="text" id="filter-plate" placeholder="AB-123-CD">
-                        </div>
-                        <button type="button" class="btn btn-secondary btn-full" id="btn-apply-filters">
-                            Appliquer les filtres
-                        </button>
-                        <button type="button" class="btn btn-ghost btn-full" id="btn-reset-filters">
-                            Réinitialiser
-                        </button>
-                    </div>
-                </div>
+    const counts = days.map(d => State.observations.filter(o => o.date === d).length);
 
-                <div id="history-list" class="history-list">
-                    <p class="text-muted text-center">Aucune observation.</p>
-                </div>
+    State.charts.daily = new Chart(canvas, {
+      type: 'bar',
+      data: {
+        labels: days.map(d => d.slice(5)),
+        datasets: [{ label: 'Observations', data: counts, backgroundColor: 'rgba(59,130,246,0.6)', borderColor: '#3b82f6', borderWidth: 1, borderRadius: 4 }]
+      },
+      options: {
+        responsive: true,
+        plugins: { legend: { display: false } },
+        scales: {
+          y: { beginAtZero: true, ticks: { color: '#94a3b8', stepSize: 1 }, grid: { color: 'rgba(51,65,85,0.5)' } },
+          x: { ticks: { color: '#94a3b8', maxRotation: 45 }, grid: { display: false } }
+        }
+      }
+    });
+  },
 
-                <div id="history-pagination" class="pagination"></div>
-            </section>
+  renderCategoryChart() {
+    const canvas = document.getElementById('chart-categories');
+    if (State.charts.categories) State.charts.categories.destroy();
 
-            <!-- ===== PAGE : FICHE PLAQUE ===== -->
-            <section id="page-plate-detail" class="page">
-                <button type="button" id="btn-back-history" class="btn btn-ghost">
-                    ← Retour à l'historique
-                </button>
-                
-                <div class="plate-detail-header">
-                    <div class="plate-badge-large" id="detail-plate-number">--</div>
-                    <button type="button" id="btn-toggle-favorite" class="btn-icon btn-favorite">☆</button>
-                </div>
+    const catCounts = {};
+    State.observations.forEach(o => (o.categories||[]).forEach(c => { catCounts[c] = (catCounts[c]||0)+1; }));
+    const entries = Object.entries(catCounts).sort((a,b) => b[1]-a[1]);
 
-                <div class="dashboard-grid">
-                    <div class="stat-card">
-                        <div class="stat-value" id="detail-obs-count">0</div>
-                        <div class="stat-label">Observations</div>
-                    </div>
-                    <div class="stat-card">
-                        <div class="stat-value" id="detail-first-date">-</div>
-                        <div class="stat-label">Première obs.</div>
-                    </div>
-                    <div class="stat-card">
-                        <div class="stat-value" id="detail-last-date">-</div>
-                        <div class="stat-label">Dernière obs.</div>
-                    </div>
-                </div>
+    const colors = ['#3b82f6','#22c55e','#f59e0b','#ef4444','#8b5cf6','#ec4899','#14b8a6','#f97316','#6366f1','#84cc16','#06b6d4','#e11d48','#a855f7','#10b981','#f43f5e','#0ea5e9','#eab308'];
 
-                <div class="card">
-                    <h3>Répartition des catégories</h3>
-                    <div id="detail-categories-chart"></div>
-                </div>
+    State.charts.categories = new Chart(canvas, {
+      type: 'doughnut',
+      data: {
+        labels: entries.map(e => e[0]),
+        datasets: [{ data: entries.map(e => e[1]), backgroundColor: colors.slice(0, entries.length), borderWidth: 0 }]
+      },
+      options: {
+        responsive: true,
+        plugins: { legend: { position: 'bottom', labels: { color: '#94a3b8', boxWidth: 12, padding: 8, font: { size: 11 } } } }
+      }
+    });
+  },
 
-                <div class="card">
-                    <h3>Photos</h3>
-                    <div id="detail-photos" class="photos-gallery"></div>
-                </div>
+  renderMonthlyChart() {
+    const canvas = document.getElementById('chart-monthly');
+    if (State.charts.monthly) State.charts.monthly.destroy();
 
-                <div class="card">
-                    <h3>Historique complet</h3>
-                    <div id="detail-observations-list"></div>
-                </div>
-            </section>
+    const months = {};
+    State.observations.forEach(o => {
+      if (o.date) {
+        const m = o.date.slice(0,7);
+        months[m] = (months[m]||0)+1;
+      }
+    });
+    const sorted = Object.entries(months).sort((a,b) => a[0].localeCompare(b[0])).slice(-12);
 
-            <!-- ===== PAGE : STATISTIQUES ===== -->
-            <section id="page-statistics" class="page">
-                <div class="card">
-                    <h3>📅 Observations par jour (30 derniers jours)</h3>
-                    <canvas id="chart-daily" width="400" height="200"></canvas>
-                </div>
-                <div class="card">
-                    <h3>📆 Observations par semaine</h3>
-                    <canvas id="chart-weekly" width="400" height="200"></canvas>
-                </div>
-                <div class="card">
-                    <h3>🗓️ Observations par mo
+    State.charts.monthly = new Chart(canvas, {
+      type: 'line',
+      data: {
+        labels: sorted.map(e => e[0]),
+        datasets: [{
+          label: 'Observations',
+          data: sorted.map(e => e[1]),
+          borderColor: '#22c55e',
+          backgroundColor: 'rgba(34,197,94,0.1)',
+          fill: true, tension: 0.4, pointRadius: 4,
+          pointBackgroundColor: '#22c55e'
+        }]
+      },
+      options: {
+        responsive: true,
+        plugins: { legend: { display: false } },
+        scales: {
+          y: { beginAtZero: true, ticks: { color: '#94a3b8', stepSize: 1 }, grid: { color: 'rgba(51,65,85,0.5)' } },
+          x: { ticks: { color: '#94a3b8' }, grid: { display: false } }
+        }
+      }
+    });
+  },
+
+  renderTopPlates() {
+    const plateCounts = {};
+    State.observations.forEach(o => { plateCounts[o.plate] = (plateCounts[o.plate]||0)+1; });
+    const top = Object.entries(plateCounts).sort((a,b) => b[1]-a[1]).slice(0,10);
+    const esc = (s) => { const d=document.createElement('div'); d.textContent=s; return d.innerHTML; };
+
+    document.getElementById('stats-top-plates').innerHTML = top.length > 0 ?
+      top.map(([p,c], i) => `
+        <div style="display:flex;align-items:center;justify-content:space-between;padding:10px 0;border-bottom:1px solid var(--border);">
+          <div style="display:flex;align-items:center;gap:12px;">
+            <span style="color:var(--text-muted);font-weight:700;width:24px;">#${i+1}</span>
+            <span class="plate-badge" onclick="PlateDetail.show('${esc(p)}')">${esc(p)}</span>
+          </div>
+          <span style="font-weight:700;color:var(--accent);">${c}</span>
+        </div>
+      `).join('') :
+      '<p style="color:var(--text-muted);text-align:center;">Aucune donnée</p>';
+  }
+};
+
+/* ============================================================
+   MAP MODULE
+   ============================================================ */
+const MapModule = {
+  render() {
+    const container = document.getElementById('map-container');
+    if (!State.leafletMap) {
+      State.leafletMap = L.map(container).setView([46.6, 2.3], 6);
+      L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
+        attribution: '&copy; OpenStreetMap'
+      }).addTo(State.leafletMap);
+      State.leafletMarkers = L.layerGroup().addTo(State.leafletMap);
+    }
+
+    setTimeout(() => {
+      State.leafletMap.invalidateSize();
+      State.leafletMarkers.clearLayers();
+
+      const geoObs = State.observations.filter(o => o.lat && o.lng);
+      const esc = (s) => { const d=document.createElement('div'); d.textContent=s||''; return d.innerHTML; };
+
+      geoObs.forEach(o => {
+        const marker = L.marker([o.lat, o.lng]).addTo(State.leafletMarkers);
+        const popupContent = `
+          <div style="font-size:0.85rem;">
+            <strong style="font-size:1rem;">${esc(o.plate)}</strong><br>
+            ${esc(o.date)} ${esc(o.time)}<br>
+            <em>${(o.categories||[]).join(', ')}</em>
+            ${o.notes ? '<br>' + esc(o.notes) : ''}
+            ${(o.photos||[]).length > 0 ? '<br><img src="'+o.photos[0]+'" style="max-width:120px;border-radius:4px;margin-top:4px;">' : ''}
+          </div>
+        `;
+        marker.bindPopup(popupContent);
+      });
+
+      if (geoObs.length > 0) {
+        const bounds = L.latLngBounds(geoObs.map(o => [o.lat, o.lng]));
+        State.leafletMap.fitBounds(bounds, { padding: [30, 30] });
+      }
+    }, 200);
+  }
+};
+
+/* ============================================================
+   FAVORITES MODULE
+   ============================================================ */
+const FavoritesModule = {
+  toggle(plate) {
+    const idx = State.favorites.indexOf(plate);
+    if (idx >= 0) State.favorites.splice(idx, 1);
+    else State.favorites.push(plate);
+    GistSync.push();
+  },
+
+  render() {
+    const esc = (s) => { const d=document.createElement('div'); d.textContent=s; return d.innerHTML; };
+
+    if (State.favorites.length === 0) {
+      document.getElementById('favorites-list').innerHTML = '<div class="card" style="text-align:center;color:var(--text-muted);">Aucun favori. Cliquez sur ☆ pour ajouter.</div>';
+      return;
+    }
+
+    document.getElementById('favorites-list').innerHTML = State.favorites.map(plate => {
+      const count = State.observations.filter(o => o.plate === plate).length;
+      return `
+        <div class="card" style="display:flex;align-items:center;justify-content:space-between;cursor:pointer;" onclick="PlateDetail.show('${esc(plate)}')">
+          <div>
+            <span class="plate-badge">${esc(plate)}</span>
+            <span style="color:var(--text-muted);font-size:0.85rem;margin-left:8px;">${count} observation${count>1?'s':''}</span>
+          </div>
+          <button class="star-btn" onclick="event.stopPropagation();FavoritesModule.toggle('${esc(plate)}');FavoritesModule.render();">⭐</button>
+        </div>
+      `;
+    }).join('');
+  }
+};
+
+/* ============================================================
+   CATEGORIES MODULE
+   ============================================================ */
+const CategoriesModule = {
+  render() {
+    const esc = (s) => { const d=document.createElement('div'); d.textContent=s; return d.innerHTML; };
+    document.getElementById('categories-list').innerHTML = State.categories.map((cat, i) => `
+      <div class="cat-list-item">
+        <span style="font-size:0.9rem;">${esc(cat)}</span>
+        <div style="display:flex;gap:4px;">
+          <button class="btn-icon btn-secondary" onclick="CategoriesModule.edit(${i})" title="Modifier">
+            <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M11 4H4a2 2 0 00-2 2v14a2 2 0 002 2h14a2 2 0 002-2v-7"/><path d="M18.5 2.5a2.121 2.121 0 013 3L12 15l-4 1 1-4 9.5-9.5z"/></svg>
+          </button>
+          <button class="btn-icon" style="background:rgba(239,68,68,0.15);color:var(--danger);" onclick="CategoriesModule.remove(${i})" title="Supprimer">
+            <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="3 6 5 6 21 6"/><path d="M19 6v14a2 2 0 01-2 2H7a2 2 0 01-2-2V6m3 0V4a2 2 0 012-2h4a2 2 0 012 2v2"/></svg>
+          </button>
+        </div>
+      </div>
+    `).join('');
+  },
+
+  async add() {
+    const input = document.getElementById('new-cat-input');
+    const val = input.value.trim();
+    if (!val) return;
+    if (State.categories.includes(val)) { App.toast('Cette catégorie existe déjà', 'error'); return; }
+    State.categories.push(val);
+    input.value = '';
+    await GistSync.push();
+    App.toast('Catégorie ajoutée !', 'success');
+    this.render();
+  },
+
+  edit(index) {
+    const current = State.categories[index];
+    const newVal = prompt('Modifier la catégorie :', current);
+    if (newVal !== null && newVal.trim() !== '') {
+      // Also update all observations using this category
+      State.observations.forEach(o => {
+        const ci = (o.categories||[]).indexOf(current);
+        if (ci >= 0) o.categories[ci] = newVal.trim();
+      });
+      State.categories[index] = newVal.trim();
+      GistSync.push();
+      App.toast('Catégorie modifiée !', 'success');
+      this.render();
+    }
+  },
+
+  async remove(index) {
+    if (!confirm('Supprimer cette catégorie ?')) return;
+    const cat = State.categories[index];
+    State.categories.splice(index, 1);
+    // Remove from observations
+    State.observations.forEach(o => {
+      o.categories = (o.categories||[]).filter(c => c !== cat);
+    });
+    await GistSync.push();
+    App.toast('Catégorie supprimée', 'success');
+    this.render();
+  }
+};
+
+/* ============================================================
+   EXPORT MODULE
+   ============================================================ */
+const ExportModule = {
+  /** Export to CSV */
+  toCSV() {
+    const headers = ['Plaque','Date','Heure','Catégories','Lieu','Direction','Notes','Latitude','Longitude'];
+    const rows = State.observations.map(o => [
+      o.plate, o.date, o.time,
+      (o.categories||[]).join('; '),
+      o.lieu||'', o.direction||'', o.notes||'',
+      o.lat||'', o.lng||''
+    ]);
+    let csv = '\uFEFF'; // BOM for Excel
+    csv += headers.join(',') + '\n';
+    rows.forEach(r => {
+      csv += r.map(v => '"' + String(v).replace(/"/g,'""') + '"').join(',') + '\n';
+    });
+    this.download(csv, 'roadlog_export.csv', 'text/csv;charset=utf-8;');
+    App.toast('Export CSV terminé !', 'success');
+  },
+
+  /** Export to Excel */
+  toExcel() {
+    const data = State.observations.map(o => ({
+      'Plaque': o.plate,
+      'Date': o.date,
+      'Heure': o.time,
+      'Catégories': (o.categories||[]).join('; '),
+      'Lieu': o.lieu||'',
+      'Direction': o.direction||'',
+      'Notes': o.notes||'',
+      'Latitude': o.lat||'',
+      'Longitude': o.lng||''
+    }));
+    const ws = XLSX.utils.json_to_sheet(data);
+    const wb = XLSX.utils.book_new();
+    XLSX.utils.book_append_sheet(wb, ws, 'Observations');
+    XLSX.writeFile(wb, 'roadlog_export.xlsx');
+    App.toast('Export Excel terminé !', 'success');
+  },
+
+  /** Export to PDF */
+  toPDF() {
+    const { jsPDF } = window.jspdf;
+    const doc = new jsPDF();
+
+    doc.setFontSize(18);
+    doc.text('RoadLog - Export des observations', 14, 22);
+    doc.setFontSize(10);
+    doc.text(`Généré le ${new Date().toLocaleString('fr-FR')}`, 14, 30);
+    doc.text(`Total: ${State.observations.length} observation(s)`, 14, 36);
+
+    let y = 46;
+    doc.setFontSize(8);
+
+    // Headers
+    doc.setFont(undefined, 'bold');
+    doc.text('Plaque', 14, y);
+    doc.text('Date', 50, y);
+    doc.text('Heure', 78, y);
+    doc.text('Catégories', 98, y);
+    doc.text('Lieu', 160, y);
+    doc.setFont(undefined, 'normal');
+    y += 6;
+
+    State.observations.forEach(o => {
+      if (y > 280) { doc.addPage(); y = 20; }
+      doc.text(o.plate || '', 14, y);
+      doc.text(o.date || '', 50, y);
+      doc.text(o.time || '', 78, y);
+      doc.text((o.categories||[]).join(', ').substring(0, 40), 98, y);
+      doc.text((o.lieu||'').substring(0, 20), 160, y);
+      y += 5;
+    });
+
+    doc.save('roadlog_export.pdf');
+    App.toast('Export PDF terminé !', 'success');
+  },
+
+  /** Download helper */
+  download(content, filename, mime) {
+    const blob = new Blob([content], { type: mime });
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement('a');
+    a.href = url; a.download = filename;
+    document.body.appendChild(a);
+    a.click();
+    document.body.removeChild(a);
+    URL.revokeObjectURL(url);
+  }
+};
+
+/* ============================================================
+   SHARE MODULE
+   ============================================================ */
+const ShareModule = {
+  render() {
+    document.getElementById('share-gist-id').value = State.config.gistId || '';
+
+    // QR Code
+    const qrContainer = document.getElementById('qr-code');
+    qrContainer.innerHTML = '';
+    if (typeof QRCode !== 'undefined') {
+      const appUrl = window.location.href;
+      new QRCode(qrContainer, {
+        text: appUrl,
+        width: 200,
+        height: 200,
+        colorDark: '#f1f5f9',
+        colorLight: '#1e293b',
+        correctLevel: QRCode.CorrectLevel.H
+      });
+    }
+  }
+};
+
+/* ============================================================
+   SETTINGS MODULE
+   ============================================================ */
+const SettingsModule = {
+  load() {
+    document.getElementById('settings-token').value = State.config.token || '';
+    document.getElementById('settings-gist').value = State.config.gistId || '';
+    document.getElementById('settings-alert-threshold').value = State.config.alertThreshold || 3;
+    document.getElementById('settings-geo').checked = State.config.geoEnabled !== false;
+    document.getElementById('settings-speech').checked = State.config.speechEnabled !== false;
+    document.getElementById('settings-continuous').checked = State.config.continuousMode || false;
+  },
+
+  saveGitHub() {
+    State.config.token = document.getElementById('settings-token').value.trim();
+    State.config.gistId = document.getElementById('settings-gist').value.trim();
+    localStorage.setItem('roadlog_config', JSON.stringify(State.config));
+    App.toast('Configuration GitHub sauvegardée !', 'success');
+  },
+
+  savePrefs() {
+    State.config.alertThreshold = parseInt(document.getElementById('settings-alert-threshold').value) || 3;
+    State.config.geoEnabled = document.getElementById('settings-geo').checked;
+    State.config.speechEnabled = document.getElementById('settings-speech').checked;
+    State.config.continuousMode = document.getElementById('settings-continuous').checked;
+    localStorage.setItem('roadlog_config', JSON.stringify(State.config));
+    App.toast('Préférences sauvegardées !', 'success');
+  }
+};
+
+/* ============================================================
+   SPEECH MODULE – Web Speech API
+   ============================================================ */
+const SpeechModule = {
+  recognition: null,
+  isListening: false,
+  continuousMode: false,
+
+  /** Start speech recognition */
+  startRecognition(oneHandMode = false) {
+    if (!('webkitSpeechRecognition' in window) && !('SpeechRecognition' in window)) {
+      App.toast('Reconnaissance vocale non supportée', 'error');
+      return;
+    }
+
+    const SpeechRecognition = window.SpeechRecognition || window.webkitSpeechRecognition;
+    this.recognition = new SpeechRecognition();
+    this.recognition.lang = 'fr-FR';
+    this.recognition.continuous = State.config.continuousMode || false;
+    this.recognition.interimResults = false;
+    this.recognition.maxAlternatives = 1;
+
+    this.recognition.onstart = () => {
+      this.isListening = true;
+      const status = document.getElementById('speech-status');
+      if (status) status.innerHTML = '<span class="speech-indicator"><span class="speech-dot"></span> Écoute en cours...</span>';
+      const btn = document.getElementById('btn-speech');
+      if (btn) btn.style.background = 'var(--danger)';
+    };
+
+    this.recognition.onresult = (event) => {
+      const transcript = event.results[event.results.length - 1][0].transcript;
+      console.log('Speech result:', transcript);
+      this.processTranscript(transcript);
+    };
+
+    this.recognition.onend = () => {
+      this.isListening = false;
+      const status = document.getElementById('speech-status');
+      if (status) status.textContent = 'Appuyez pour dicter';
+      const btn = document.getElementById('btn-speech');
+      if (btn) btn.style.background = '';
+      document.getElementById('btn-one-hand').classList.remove('listening');
+
+      // Continuous mode: restart
+      if (State.config.continuousMode && this.continuousMode) {
+        setTimeout(() => this.startRecognition(), 500);
+      }
+    };
+
+    this.recognition.onerror = (event) => {
+      console.error('Speech error:', event.error);
+      if (event.error !== 'no-speech' && event.error !== 'aborted') {
+        App.toast('Erreur vocale: ' + event.error, 'error');
+      }
+    };
+
+    if (oneHandMode) {
+      // Navigate to new obs form first
+      if (State.currentPage !== 'new-observation') {
+        App.navigate('new-observation');
+        setTimeout(() => this.recognition.start(), 300);
+        return;
+      }
+    }
+
+    this.recognition.start();
+  },
+
+  /** Stop recognition */
+  stopRecognition() {
+    if (this.recognition) {
+      this.continuousMode = false;
+      this.recognition.stop();
+    }
+  },
+
+  /** Process transcript to extract plate and categories */
+  processTranscript(text) {
+    console.log('Processing:', text);
+
+    // Ensure we're on the observation form page
+    if (State.currentPage !== 'new-observation') {
+      App.navigate('new-observation');
+      setTimeout(() => this._fillFromTranscript(text), 300);
+    } else {
+      this._fillFromTranscript(text);
+    }
+  },
+
+  /** Fill form from transcript – rule-based NLP
+   *  Architecture ready for AI module replacement */
+  _fillFromTranscript(text) {
+    const result = AIModule.parseTranscript(text);
+
+    if (result.plate) {
+      document.getElementById('obs-plate').value = result.plate;
+      ObsForm.checkPlateAlerts();
+    }
+
+    if (result.categories.length > 0) {
+      result.categories.forEach(cat => {
+        if (!ObsForm.selectedCategories.includes(cat)) {
+          ObsForm.selectedCategories.push(cat);
+        }
+      });
+      ObsForm.renderCategories();
+    }
+
+    if (result.notes) {
+      const notesEl = document.getElementById('obs-notes');
+      notesEl.value = (notesEl.value ? notesEl.value + '\n' : '') + result.notes;
+    }
+
+    App.toast('Dictée traitée – vérifiez les champs', 'info');
+  }
+};
+
+/* ============================================================
+   AI MODULE – Architecture prête pour IA future
+   ============================================================ */
+const AIModule = {
+  /**
+   * Parse a transcript and extract structured data.
+   * Currently uses rule-based matching.
+   * Future: Replace with AI API call (OpenAI, local LLM, etc.)
+   *
+   * @param {string} text - The raw transcript
+   * @returns {{ plate: string|null, categories: string[], notes: string }}
+   */
+  parseTranscript(text) {
+    const result = { plate: null, categories: [], notes: text };
+
+    // === Plate detection ===
+    // French plates: AA-000-AA or AA 000 AA etc.
+    const platePatterns = [
+      /([A-Z]{2})\s*[-.]?\s*(\d{3})\s*[-.]?\s*([A-Z]{2})/i
+    ];
+    for (const pattern of platePatterns) {
+      const match = text.toUpperCase().replace(/[ÉÈÊ]/g,'E').match(pattern);
+      if (match) {
+        result.plate = `${match[1]}-${match[2]}-${match[3]}`.toUpperCase();
+        break;
+      }
+    }
+
+    // Also try spoken forms like "alpha bravo 123 charlie delta"
+    // or just letter sequences
+    if (!result.plate) {
+      const letterMap = {
+        'alpha':'A','bravo':'B','charlie':'C','delta':'D','echo':'E','foxtrot':'F',
+        'golf':'G','hotel':'H','india':'I','juliet':'J','kilo':'K','lima':'L',
+        'mike':'M','november':'N','oscar':'O','papa':'P','quebec':'Q','romeo':'R',
+        'sierra':'S','tango':'T','uniform':'U','victor':'V','whisky':'W',
+        'xray':'X','yankee':'Y','zulu':'Z'
+      };
+      let cleaned = text.toLowerCase();
+      Object.entries(letterMap).forEach(([word, letter]) => {
+        cleaned = cleaned.replace(new RegExp(word, 'gi'), letter);
+      });
+      // Try again
+      const m = cleaned.toUpperCase().match(/([A-Z]{2})\s*(\d{3})\s*([A-Z]{2})/);
+      if (m) result.plate = `${m[1]}-${m[2]}-${m[3]}`;
+    }
+
+    // === Category detection ===
+    const textLower = text.toLowerCase();
+
+    const categoryKeywords = {
+      "Téléphone au volant": ["téléphone", "telephone", "portable", "tel au volant"],
+      "Refus de priorité": ["refus de priorité", "priorité", "refus priorite", "grillé la priorité"],
+      "Vitesse manifestement excessive": ["vitesse excessive", "trop vite", "excès de vitesse", "vitesse"],
+      "Franchissement de feu rouge": ["feu rouge", "grillé le feu", "feu grillé"],
+      "Stop non marqué": ["stop", "stop grillé"],
+      "Dépassement dangereux": ["dépassement dangereux", "depassement dangereux"],
+      "Dépassement par la droite": ["dépassement par la droite", "doublé par la droite", "dépassé par la droite"],
+      "Dépassement par la gauche": ["dépassement par la gauche"],
+      "Queue de poisson": ["queue de poisson", "coupé la route", "couper la route"],
+      "Non-respect des distances de sécurité": ["distance", "trop près", "collé", "distances de sécurité"],
+      "Changement de voie dangereux": ["changement de voie", "changé de voie"],
+      "Clignotant non utilisé": ["clignotant", "pas de clignotant", "sans clignotant"],
+      "Circulation sur bande d'arrêt d'urgence": ["bande d'arrêt", "bau", "bande urgence"],
+      "Stationnement gênant": ["stationnement", "stationné", "garé", "mal garé"],
+      "Éclairage défectueux": ["éclairage", "phare", "feux défectueux", "pas de feux"],
+      "Comportement agressif": ["agressif", "agressivité", "insulte", "klaxon", "menace", "menaçant"],
+      "Autre": []
+    };
+
+    Object.entries(categoryKeywords).forEach(([category, keywords]) => {
+      if (keywords.some(kw => textLower.includes(kw))) {
+        if (!result.categories.includes(category)) {
+          result.categories.push(category);
+        }
+      }
+    });
+
+    return result;
+  },
+
+  /**
+   * Future AI processing method
+   * @param {string} text - Natural language input
+   * @returns {Promise<object>} Parsed result
+   */
+  async processWithAI(text) {
+    // PLACEHOLDER: This is where an AI API call would go.
+    // Example architecture:
+    //
+    // const response = await fetch('https://api.openai.com/v1/chat/completions', {
+    //   method: 'POST',
+    //   headers: {
+    //     'Authorization': 'Bearer ' + State.config.aiApiKey,
+    //     'Content-Type': 'application/json'
+    //   },
+    //   body: JSON.stringify({
+    //     model: 'gpt-4',
+    //     messages: [{
+    //       role: 'system',
+    //       content: 'Extract license plate, driving violations, and description from French text...'
+    //     }, {
+    //       role: 'user',
+    //       content: text
+    //     }]
+    //   })
+    // });
+    // return await response.json();
+
+    // For now, fall back to rule-based parsing
+    return this.parseTranscript(text);
+  },
+
+  /**
+   * Future OCR processing method
+   * @param {string} imageBase64 - Image data
+   * @returns {Promise<string>} Detected plate number
+   */
+  async processOCR(imageBase64) {
+    // PLACEHOLDER: OCR integration point
+    // Could use Tesseract.js or a cloud OCR API
+    return null;
+  }
+};
+
+/* ============================================================
+   SERVICE WORKER REGISTRATION (PWA)
+   ============================================================ */
+if ('serviceWorker' in navigator) {
+  window.addEventListener('load', () => {
+    navigator.serviceWorker.register('sw.js').catch(() => {
+      console.log('Service worker not available (dev mode)');
+    });
+  });
+}
+
+/* ============================================================
+   INITIALIZE APPLICATION
+   ============================================================ */
+document.addEventListener('DOMContentLoaded', () => {
+  App.init();
+});
+
+// Keyboard shortcut: Escape to close modal/sidebar
+document.addEventListener('keydown', (e) => {
+  if (e.key === 'Escape') {
+    App.forceCloseModal();
+    App.closeSidebar();
+  }
+});
+</script>
+
+</body>
+</html>

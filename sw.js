@@ -1,80 +1,61 @@
 /**
- * RoadLog - Service Worker
- * Gestion du cache pour le mode hors ligne et les performances
+ * RoadLog – Service Worker
+ * Enables PWA installation and basic offline caching
  */
 
 const CACHE_NAME = 'roadlog-v1';
-const STATIC_ASSETS = [
-    '/',
-    '/index.html',
-    '/css/main.css',
-    '/css/components.css',
-    '/css/responsive.css',
-    '/js/config.js',
-    '/js/utils.js',
-    '/js/storage.js',
-    '/js/github.js',
-    '/js/router.js',
-    '/js/ui.js',
-    '/js/speech.js',
-    '/js/ai.js',
-    '/js/geo.js',
-    '/js/camera.js',
-    '/js/stats.js',
-    '/js/map.js',
-    '/js/export.js',
-    '/js/qrcode.js',
-    '/js/app.js',
-    '/manifest.json'
+const ASSETS_TO_CACHE = [
+  './index.html',
+  './manifest.json'
 ];
 
-// Installation du service worker
+// Install event – cache core assets
 self.addEventListener('install', (event) => {
-    event.waitUntil(
-        caches.open(CACHE_NAME)
-            .then((cache) => cache.addAll(STATIC_ASSETS))
-            .then(() => self.skipWaiting())
-    );
+  event.waitUntil(
+    caches.open(CACHE_NAME).then((cache) => {
+      return cache.addAll(ASSETS_TO_CACHE);
+    })
+  );
+  self.skipWaiting();
 });
 
-// Activation et nettoyage des anciens caches
+// Activate event – clean old caches
 self.addEventListener('activate', (event) => {
-    event.waitUntil(
-        caches.keys()
-            .then((cacheNames) => {
-                return Promise.all(
-                    cacheNames
-                        .filter((name) => name !== CACHE_NAME)
-                        .map((name) => caches.delete(name))
-                );
-            })
-            .then(() => self.clients.claim())
-    );
+  event.waitUntil(
+    caches.keys().then((keys) => {
+      return Promise.all(
+        keys.filter((key) => key !== CACHE_NAME).map((key) => caches.delete(key))
+      );
+    })
+  );
+  self.clients.claim();
 });
 
-// Stratégie : Network First, fallback Cache
+// Fetch event – network first, fallback to cache
 self.addEventListener('fetch', (event) => {
-    // Ne pas mettre en cache les requêtes vers l'API GitHub
-    if (event.request.url.includes('api.github.com') || 
-        event.request.url.includes('api.mistral.ai')) {
-        event.respondWith(fetch(event.request));
-        return;
-    }
+  // Skip non-GET requests
+  if (event.request.method !== 'GET') return;
 
-    event.respondWith(
-        fetch(event.request)
-            .then((response) => {
-                // Mettre en cache la réponse fraîche
-                if (response.status === 200) {
-                    const responseClone = response.clone();
-                    caches.open(CACHE_NAME)
-                        .then((cache) => cache.put(event.request, responseClone));
-                }
-                return response;
-            })
-            .catch(() => {
-                // Fallback sur le cache
-                return caches.match(event.request);
-            })
-    );
+  // Skip API calls (GitHub API should always go to network)
+  if (event.request.url.includes('api.github.com')) return;
+
+  event.respondWith(
+    fetch(event.request)
+      .then((response) => {
+        // Clone and cache successful responses
+        if (response.ok) {
+          const clone = response.clone();
+          caches.open(CACHE_NAME).then((cache) => {
+            cache.put(event.request, clone);
+          });
+        }
+        return response;
+      })
+      .catch(() => {
+        // Fallback to cache
+        return caches.match(event.request).then((cached) => {
+          return cached || new Response('Hors ligne', { status: 503 });
+        });
+      })
+  );
 });
