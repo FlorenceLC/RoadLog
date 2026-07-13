@@ -1,1 +1,437 @@
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=no, viewport-fit=cover">
+    <meta name="theme-color" content="#1a1a2e">
+    <meta name="apple-mobile-web-app-capable" content="yes">
+    <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+    <meta name="description" content="RoadLog - Journal d'observations routières">
+    
+    <title>RoadLog</title>
+    
+    <!-- Manifest PWA -->
+    <link rel="manifest" href="manifest.json">
+    <link rel="apple-touch-icon" href="assets/icons/icon-192.png">
+    
+    <!-- Leaflet CSS pour la carte -->
+    <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" />
+    
+    <!-- Feuilles de style -->
+    <link rel="stylesheet" href="css/main.css">
+    <link rel="stylesheet" href="css/components.css">
+    <link rel="stylesheet" href="css/responsive.css">
+</head>
+<body>
+    <!-- ==================== ÉCRAN DE CHARGEMENT ==================== -->
+    <div id="splash-screen" class="splash-screen">
+        <div class="splash-content">
+            <div class="splash-icon">🚗</div>
+            <h1>RoadLog</h1>
+            <div class="splash-loader">
+                <div class="loader-bar"></div>
+            </div>
+            <p>Chargement...</p>
+        </div>
+    </div>
 
+    <!-- ==================== ÉCRAN DE CONFIGURATION INITIALE ==================== -->
+    <div id="setup-screen" class="setup-screen hidden">
+        <div class="setup-content">
+            <div class="setup-icon">⚙️</div>
+            <h1>Configuration initiale</h1>
+            <p>Configurez votre connexion GitHub pour synchroniser vos données.</p>
+            
+            <div class="form-group">
+                <label for="setup-token">Token GitHub (Personal Access Token)</label>
+                <div class="input-with-icon">
+                    <input type="password" id="setup-token" placeholder="ghp_xxxxxxxxxxxx" autocomplete="off">
+                    <button type="button" class="btn-icon toggle-password" data-target="setup-token">👁️</button>
+                </div>
+                <small>Nécessite les permissions : gist (read/write)</small>
+            </div>
+            
+            <div class="form-group">
+                <label for="setup-gist-id">ID du Gist (optionnel)</label>
+                <input type="text" id="setup-gist-id" placeholder="Laisser vide pour en créer un nouveau">
+                <small>Si vous avez déjà un Gist RoadLog, entrez son ID ici.</small>
+            </div>
+            
+            <button id="setup-submit" class="btn btn-primary btn-large btn-full">
+                🚀 Démarrer RoadLog
+            </button>
+            
+            <div id="setup-error" class="alert alert-error hidden"></div>
+        </div>
+    </div>
+
+    <!-- ==================== APPLICATION PRINCIPALE ==================== -->
+    <div id="app" class="app hidden">
+        
+        <!-- Overlay du menu -->
+        <div id="menu-overlay" class="menu-overlay"></div>
+        
+        <!-- ========== MENU LATÉRAL ========== -->
+        <nav id="sidebar" class="sidebar">
+            <div class="sidebar-header">
+                <div class="sidebar-logo">🚗</div>
+                <h2>RoadLog</h2>
+                <button id="sidebar-close" class="btn-icon sidebar-close">✕</button>
+            </div>
+            
+            <ul class="sidebar-menu">
+                <li>
+                    <a href="#" data-page="dashboard" class="sidebar-link active">
+                        <span class="sidebar-icon">📊</span>
+                        <span>Tableau de bord</span>
+                    </a>
+                </li>
+                <li>
+                    <a href="#" data-page="new-observation" class="sidebar-link">
+                        <span class="sidebar-icon">➕</span>
+                        <span>Nouvelle observation</span>
+                    </a>
+                </li>
+                <li>
+                    <a href="#" data-page="history" class="sidebar-link">
+                        <span class="sidebar-icon">📋</span>
+                        <span>Historique</span>
+                    </a>
+                </li>
+                <li>
+                    <a href="#" data-page="statistics" class="sidebar-link">
+                        <span class="sidebar-icon">📈</span>
+                        <span>Statistiques</span>
+                    </a>
+                </li>
+                <li>
+                    <a href="#" data-page="map" class="sidebar-link">
+                        <span class="sidebar-icon">🗺️</span>
+                        <span>Carte</span>
+                    </a>
+                </li>
+                <li>
+                    <a href="#" data-page="favorites" class="sidebar-link">
+                        <span class="sidebar-icon">⭐</span>
+                        <span>Favoris</span>
+                    </a>
+                </li>
+                <li class="sidebar-separator"></li>
+                <li>
+                    <a href="#" data-page="categories" class="sidebar-link">
+                        <span class="sidebar-icon">🏷️</span>
+                        <span>Gestion des catégories</span>
+                    </a>
+                </li>
+                <li>
+                    <a href="#" data-page="sharing" class="sidebar-link">
+                        <span class="sidebar-icon">🔗</span>
+                        <span>Partage</span>
+                    </a>
+                </li>
+                <li>
+                    <a href="#" data-page="export" class="sidebar-link">
+                        <span class="sidebar-icon">📤</span>
+                        <span>Export</span>
+                    </a>
+                </li>
+                <li>
+                    <a href="#" data-page="qrcode" class="sidebar-link">
+                        <span class="sidebar-icon">📱</span>
+                        <span>QR Code</span>
+                    </a>
+                </li>
+                <li class="sidebar-separator"></li>
+                <li>
+                    <a href="#" data-page="settings" class="sidebar-link">
+                        <span class="sidebar-icon">⚙️</span>
+                        <span>Paramètres</span>
+                    </a>
+                </li>
+            </ul>
+            
+            <div class="sidebar-footer">
+                <div class="sync-status" id="sync-status">
+                    <span class="sync-dot sync-ok"></span>
+                    <span>Synchronisé</span>
+                </div>
+            </div>
+        </nav>
+
+        <!-- ========== BARRE DE NAVIGATION SUPÉRIEURE ========== -->
+        <header class="topbar">
+            <button id="menu-toggle" class="btn-icon menu-toggle">☰</button>
+            <h1 id="page-title" class="topbar-title">Tableau de bord</h1>
+            <div class="topbar-actions">
+                <button id="sync-btn" class="btn-icon" title="Synchroniser">🔄</button>
+            </div>
+        </header>
+
+        <!-- ========== BANDEAU D'ALERTE ========== -->
+        <div id="alert-banner" class="alert-banner hidden">
+            <span id="alert-banner-text"></span>
+            <button id="alert-banner-close" class="btn-icon">✕</button>
+        </div>
+
+        <!-- ========== CONTENEUR DES PAGES ========== -->
+        <main id="main-content" class="main-content">
+
+            <!-- ===== PAGE : TABLEAU DE BORD ===== -->
+            <section id="page-dashboard" class="page active">
+                <div class="dashboard-grid">
+                    <div class="stat-card stat-total">
+                        <div class="stat-icon">📊</div>
+                        <div class="stat-value" id="stat-total">0</div>
+                        <div class="stat-label">Total</div>
+                    </div>
+                    <div class="stat-card stat-today">
+                        <div class="stat-icon">📅</div>
+                        <div class="stat-value" id="stat-today">0</div>
+                        <div class="stat-label">Aujourd'hui</div>
+                    </div>
+                    <div class="stat-card stat-week">
+                        <div class="stat-icon">📆</div>
+                        <div class="stat-value" id="stat-week">0</div>
+                        <div class="stat-label">Cette semaine</div>
+                    </div>
+                    <div class="stat-card stat-month">
+                        <div class="stat-icon">🗓️</div>
+                        <div class="stat-value" id="stat-month">0</div>
+                        <div class="stat-label">Ce mois</div>
+                    </div>
+                </div>
+
+                <div class="card" id="last-observation-card">
+                    <h3>🕐 Dernière observation</h3>
+                    <div id="last-observation-content">
+                        <p class="text-muted">Aucune observation enregistrée.</p>
+                    </div>
+                </div>
+
+                <div class="card">
+                    <h3>🔢 Plaques les plus fréquentes</h3>
+                    <div id="top-plates-content">
+                        <p class="text-muted">Aucune donnée disponible.</p>
+                    </div>
+                </div>
+
+                <div class="card">
+                    <h3>⚠️ Comportements les plus fréquents</h3>
+                    <div id="top-categories-content">
+                        <p class="text-muted">Aucune donnée disponible.</p>
+                    </div>
+                </div>
+
+                <button id="btn-new-obs-dashboard" class="btn btn-primary btn-large btn-full btn-new-obs">
+                    ➕ Nouvelle observation
+                </button>
+            </section>
+
+            <!-- ===== PAGE : NOUVELLE OBSERVATION ===== -->
+            <section id="page-new-observation" class="page">
+                <form id="observation-form" class="observation-form">
+                    <!-- ID caché pour l'édition -->
+                    <input type="hidden" id="obs-id" value="">
+                    
+                    <!-- MODE UNE MAIN -->
+                    <div class="one-hand-mode">
+                        <button type="button" id="btn-one-hand" class="btn-one-hand" title="Maintenir pour dicter">
+                            <span class="one-hand-icon">🎤</span>
+                            <span class="one-hand-label">Maintenir pour dicter</span>
+                        </button>
+                    </div>
+
+                    <!-- Plaque d'immatriculation -->
+                    <div class="form-group">
+                        <label for="obs-plate">Plaque d'immatriculation</label>
+                        <div class="input-with-icon">
+                            <input type="text" id="obs-plate" placeholder="AB-123-CD" 
+                                   class="input-plate" autocomplete="off" maxlength="10">
+                            <button type="button" class="btn-icon btn-voice-plate" title="Dicter la plaque">🎤</button>
+                        </div>
+                        <div id="plate-alert" class="plate-alert hidden"></div>
+                    </div>
+
+                    <!-- Date et heure -->
+                    <div class="form-row">
+                        <div class="form-group flex-1">
+                            <label for="obs-date">Date</label>
+                            <input type="date" id="obs-date">
+                        </div>
+                        <div class="form-group flex-1">
+                            <label for="obs-time">Heure</label>
+                            <input type="time" id="obs-time">
+                        </div>
+                    </div>
+
+                    <!-- Localisation -->
+                    <div class="form-group">
+                        <label>Localisation</label>
+                        <button type="button" id="btn-geoloc" class="btn btn-secondary btn-full">
+                            📍 Utiliser ma position
+                        </button>
+                        <div id="geoloc-result" class="geoloc-result hidden">
+                            <span id="geoloc-address"></span>
+                            <input type="hidden" id="obs-lat">
+                            <input type="hidden" id="obs-lng">
+                        </div>
+                    </div>
+
+                    <!-- Lieu -->
+                    <div class="form-group">
+                        <label for="obs-location">Lieu</label>
+                        <input type="text" id="obs-location" placeholder="Ex: Boulevard Haussmann, Paris">
+                    </div>
+
+                    <!-- Sens de circulation -->
+                    <div class="form-group">
+                        <label for="obs-direction">Sens de circulation</label>
+                        <input type="text" id="obs-direction" placeholder="Ex: Direction Nord">
+                    </div>
+
+                    <!-- Catégories -->
+                    <div class="form-group">
+                        <label>Catégorie(s) d'observation</label>
+                        <div id="categories-container" class="categories-grid">
+                            <!-- Rempli dynamiquement -->
+                        </div>
+                    </div>
+
+                    <!-- Notes -->
+                    <div class="form-group">
+                        <label for="obs-notes">Notes</label>
+                        <div class="input-with-icon textarea-with-icon">
+                            <textarea id="obs-notes" rows="4" placeholder="Détails supplémentaires..."></textarea>
+                            <button type="button" class="btn-icon btn-voice-notes" title="Dicter les notes">🎤</button>
+                        </div>
+                    </div>
+
+                    <!-- Photos -->
+                    <div class="form-group">
+                        <label>Photos</label>
+                        <div class="photo-actions">
+                            <button type="button" id="btn-take-photo" class="btn btn-secondary">
+                                📸 Prendre une photo
+                            </button>
+                            <button type="button" id="btn-import-photo" class="btn btn-secondary">
+                                🖼️ Importer
+                            </button>
+                        </div>
+                        <input type="file" id="photo-input" accept="image/*" multiple class="hidden">
+                        <input type="file" id="camera-input" accept="image/*" capture="environment" class="hidden">
+                        <div id="photos-preview" class="photos-preview"></div>
+                    </div>
+
+                    <!-- Boutons d'action -->
+                    <div class="form-actions">
+                        <button type="submit" class="btn btn-primary btn-large btn-full">
+                            💾 Enregistrer l'observation
+                        </button>
+                        <button type="button" id="btn-cancel-obs" class="btn btn-ghost btn-full">
+                            Annuler
+                        </button>
+                    </div>
+                </form>
+            </section>
+
+            <!-- ===== PAGE : HISTORIQUE ===== -->
+            <section id="page-history" class="page">
+                <div class="search-bar">
+                    <input type="text" id="history-search" placeholder="🔍 Rechercher une plaque, un lieu...">
+                </div>
+                
+                <div class="filters-bar">
+                    <button type="button" class="btn btn-small btn-filter" id="btn-filter-toggle">
+                        🔽 Filtres
+                    </button>
+                    <div id="filters-panel" class="filters-panel hidden">
+                        <div class="form-row">
+                            <div class="form-group flex-1">
+                                <label for="filter-date-start">Du</label>
+                                <input type="date" id="filter-date-start">
+                            </div>
+                            <div class="form-group flex-1">
+                                <label for="filter-date-end">Au</label>
+                                <input type="date" id="filter-date-end">
+                            </div>
+                        </div>
+                        <div class="form-group">
+                            <label for="filter-category">Catégorie</label>
+                            <select id="filter-category">
+                                <option value="">Toutes</option>
+                            </select>
+                        </div>
+                        <div class="form-group">
+                            <label for="filter-plate">Plaque</label>
+                            <input type="text" id="filter-plate" placeholder="AB-123-CD">
+                        </div>
+                        <button type="button" class="btn btn-secondary btn-full" id="btn-apply-filters">
+                            Appliquer les filtres
+                        </button>
+                        <button type="button" class="btn btn-ghost btn-full" id="btn-reset-filters">
+                            Réinitialiser
+                        </button>
+                    </div>
+                </div>
+
+                <div id="history-list" class="history-list">
+                    <p class="text-muted text-center">Aucune observation.</p>
+                </div>
+
+                <div id="history-pagination" class="pagination"></div>
+            </section>
+
+            <!-- ===== PAGE : FICHE PLAQUE ===== -->
+            <section id="page-plate-detail" class="page">
+                <button type="button" id="btn-back-history" class="btn btn-ghost">
+                    ← Retour à l'historique
+                </button>
+                
+                <div class="plate-detail-header">
+                    <div class="plate-badge-large" id="detail-plate-number">--</div>
+                    <button type="button" id="btn-toggle-favorite" class="btn-icon btn-favorite">☆</button>
+                </div>
+
+                <div class="dashboard-grid">
+                    <div class="stat-card">
+                        <div class="stat-value" id="detail-obs-count">0</div>
+                        <div class="stat-label">Observations</div>
+                    </div>
+                    <div class="stat-card">
+                        <div class="stat-value" id="detail-first-date">-</div>
+                        <div class="stat-label">Première obs.</div>
+                    </div>
+                    <div class="stat-card">
+                        <div class="stat-value" id="detail-last-date">-</div>
+                        <div class="stat-label">Dernière obs.</div>
+                    </div>
+                </div>
+
+                <div class="card">
+                    <h3>Répartition des catégories</h3>
+                    <div id="detail-categories-chart"></div>
+                </div>
+
+                <div class="card">
+                    <h3>Photos</h3>
+                    <div id="detail-photos" class="photos-gallery"></div>
+                </div>
+
+                <div class="card">
+                    <h3>Historique complet</h3>
+                    <div id="detail-observations-list"></div>
+                </div>
+            </section>
+
+            <!-- ===== PAGE : STATISTIQUES ===== -->
+            <section id="page-statistics" class="page">
+                <div class="card">
+                    <h3>📅 Observations par jour (30 derniers jours)</h3>
+                    <canvas id="chart-daily" width="400" height="200"></canvas>
+                </div>
+                <div class="card">
+                    <h3>📆 Observations par semaine</h3>
+                    <canvas id="chart-weekly" width="400" height="200"></canvas>
+                </div>
+                <div class="card">
+                    <h3>🗓️ Observations par mo
